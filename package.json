@@ -1,0 +1,17 @@
+{
+  "name": "http-305",
+  "version": "1.0.0",
+  "description": "12 Foot Ladder style http proxy",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npm install",
+    "start": "node app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
