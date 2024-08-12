@@ -12,15 +12,22 @@ app.use(express.static('public'));
 // Define a simple route
 app.get('/pxy', (req, res) => {
   const country = req.get("CF-IPCountry");
-  return res.status(200).send(`Welcome to HTTP 305 (${country})`);
+  const gbRedirect = req.query.ukred === '1' || req.query.ukred === 'true';
+
+  let wouldRedirect = false;
+  if(country && country.toLowerCase() == "gb" && ukRedirect){
+    wouldRedirect = true;
+  }
+  return res.status(200).send(`Welcome to HTTP 305 (${country}) <br />gbRedirect: ${gbRedirect} <br />wouldRedirect: ${wouldRedirect})`);
 });
 
 // Handle HTML and resource proxying
 app.get("/pxy/html", (req, res) => {
     const country = req.get("CF-IPCountry");
     const url = req.query.url;
-    const jsEnabled = req.query.js !== '0';
-    const gbRedirect = req.query.ukred !== '0';
+    const jsEnabled = req.query.js === '1' || req.query.js === 'true';
+    const gbRedirect = req.query.ukred === '1' || req.query.ukred === 'true';
+
     //console.log(`Redirect: ${gbRedirect}`);
 
     if(country && country.toLowerCase() == "gb" && gbRedirect){
