@@ -18,7 +18,7 @@ app.get('/pxy', (req, res) => {
   if(country && country.toLowerCase() == "gb" && ukRedirect){
     wouldRedirect = true;
   }
-  return res.status(200).send(`Welcome to HTTP 305 (${country}) <br />gbRedirect: ${gbRedirect} <br />wouldRedirect: ${wouldRedirect})`);
+  return res.status(200).send(`Welcome to HTTP 305 (${country}) <br />gbRedirect: ${gbRedirect} <br />wouldRedirect: ${wouldRedirect}`);
 });
 
 // Handle HTML and resource proxying
