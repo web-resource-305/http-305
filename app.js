@@ -17,9 +17,16 @@ app.get('/pxy', (req, res) => {
 
 // Handle HTML and resource proxying
 app.get("/pxy/html", (req, res) => {
+    const country = req.get("CF-IPCountry");
     const url = req.query.url;
-    const jsParam = req.query.js;
-    const jsEnabled = jsParam !== '0';
+    const jsEnabled = req.query.js !== '0';
+    const gbRedirect = req.query.ukred !== '0';
+    //console.log(`Redirect: ${gbRedirect}`);
+
+    if(country && country.toLowerCase() == "gb" && gbRedirect){
+        res.redirect(url);
+    }
+
     if (!url) {
         return res.status(400).send("Please provide a URL");
     }
