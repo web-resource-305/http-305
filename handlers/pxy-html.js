@@ -75,8 +75,6 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
     return res.status(400).send("URL parameter is required");
   }
 
-  console.log(`JavaScript: ${jsEnabled}`);
-
   // Decode the URI if it was encoded
   try {
     addressToProxy = decodeURIComponent(addressToProxy);
@@ -156,7 +154,8 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
     return res.send(dom.serialize());
   } catch (error) {
     logger.error("Error fetching or modifying HTML:", error);
-
-    return res.status(500).send("Internal Server Error");
+    if (!res.headersSent) {
+      return res.status(500).send("Internal Server Error");
+    } 
   }
 };
