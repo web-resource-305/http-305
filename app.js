@@ -15,7 +15,7 @@ app.get('/pxy', (req, res) => {
   const gbRedirect = req.query.ukred === '1' || req.query.ukred === 'true';
 
   let wouldRedirect = false;
-  if(country && country.toLowerCase() == "gb" && ukRedirect){
+  if(country && country.toLowerCase() == "gb" && gbRedirect){
     wouldRedirect = true;
   }
   return res.status(200).send(`Welcome to HTTP 305 (${country}) <br />gbRedirect: ${gbRedirect} <br />wouldRedirect: ${wouldRedirect}`);
