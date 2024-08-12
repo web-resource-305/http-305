@@ -3,7 +3,7 @@ const { JSDOM } = require("jsdom");
 const { createLogger, transports, format } = require("winston");
 const url = require("url");
 
-// Set up logging
+// Set up logging ()
 const logger = createLogger({
   level: "info",
   format: format.combine(
@@ -44,16 +44,19 @@ const modifyURLs = (
 
       if (rewrittenUrl) {
         const tagName = el.tagName.toLowerCase();
-        let pxySlug;
+        let apiSlug;
         
-        if (tagName === "a") {
-          pxySlug = jsEnabled ? "html" : "html/nojs";
+        if (tagName === "a" || tagName === "form") {
+          apiSlug = jsEnabled ? "pxy/html" : "pxy/html/nojs";
         } else {
-          pxySlug = "resource";
-        }        
+          apiSlug = "pxy/resource";
+        } 
+        if (rewrittenUrl && rewrittenUrl.endsWith(".pdf")) {
+          apiSlug = "dl/pdf";
+        }
 
         if (tagName == "script" && !jsEnabled) {
-          console.log(`Disabling script: ${resourceUrl}`);
+          logger.debug(`Disabling script: ${rewrittenUrl}`);
           el.setAttribute(
             attribute,
             ``,
@@ -61,7 +64,7 @@ const modifyURLs = (
         } else {
           el.setAttribute(
             attribute,
-            `/pxy/${pxySlug}/${encodeURIComponent(rewrittenUrl)}`,
+            `/${apiSlug}/${encodeURIComponent(rewrittenUrl)}`,
           );
         }
       }
@@ -128,6 +131,7 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
       proxiedUrl,
       appHttpAddress
     );
+
     modifyURLs(
       // eslint-disable-next-line quotes
       document.querySelectorAll('link[rel="stylesheet"]'),
@@ -135,6 +139,7 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
       proxiedUrl,
       appHttpAddress,
     );
+
     modifyURLs(
       document.querySelectorAll("script"),
       "src",
@@ -146,6 +151,14 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
     modifyURLs(
       document.querySelectorAll("a"),
       "href",
+      proxiedUrl,
+      appHttpAddress,
+      jsEnabled
+    );
+
+    modifyURLs(
+      document.querySelectorAll("form"),
+      "action",
       proxiedUrl,
       appHttpAddress,
       jsEnabled

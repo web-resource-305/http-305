@@ -12,13 +12,7 @@ app.use(express.static('public'));
 // Define a simple route
 app.get('/pxy', (req, res) => {
   const country = req.get("CF-IPCountry");
-  const gbRedirect = req.query.ukred === '1' || req.query.ukred === 'true';
-
-  let wouldRedirect = false;
-  if(country && country.toLowerCase() == "gb" && gbRedirect){
-    wouldRedirect = true;
-  }
-  return res.status(200).send(`Welcome to HTTP 305 (${country}) <br />gbRedirect: ${gbRedirect} <br />wouldRedirect: ${wouldRedirect}`);
+  return res.status(200).send(`Welcome to HTTP 305 (${country})`);
 });
 
 // Handle HTML and resource proxying
@@ -27,8 +21,6 @@ app.get("/pxy/html", (req, res) => {
     const url = req.query.url;
     const jsEnabled = req.query.js === '1' || req.query.js === 'true';
     const gbRedirect = req.query.ukred === '1' || req.query.ukred === 'true';
-
-    //console.log(`Redirect: ${gbRedirect}`);
 
     if(country && country.toLowerCase() == "gb" && gbRedirect){
         res.redirect(url);
@@ -46,7 +38,6 @@ app.get("/pxy/html/nojs/*", (req, res) => {
     if (!uri) {
         return res.status(400).send("Please provide a URL");
     }
-    console.log("No JS uri: "+ uri)
     return pxyHTML(req, res, uri, false);
 });
 // and this second
@@ -71,11 +62,9 @@ app.get("/pxy/resource/*", async (req, res) => {
 app.get("/dl/pdf/*", (req, res) => {
     console.log("Invoked downloader");
     const uri = req.params[0]; // Capture the full URL after /dl/pdf/
-    console.log("Captured URI:", uri);
     if (!uri) {
         return res.status(400).send("Please provide a URL");
     }
-
     return dlProxyPDF(req, res, uri, req.body);
 });
 

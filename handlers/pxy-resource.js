@@ -26,7 +26,7 @@ module.exports = async (req, res, uri, data) => {
 
   try {
     // Log the incoming request
-    logger.info(`Fetching URL: ${uri}`);
+    logger.debug(`Fetching URL: ${uri}`);
 
     // Decode the URI if it was encoded
     try {
