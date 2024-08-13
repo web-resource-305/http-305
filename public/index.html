@@ -51,8 +51,8 @@
 
 <body>
     <div class="search-container">
-        <form action="/pxy/html" method="GET" target="_blank">
-            <input type="text" name="url" class="search-box" placeholder="URL...">
+        <form action="/pxy/html" method="GET" target="_blank" onsubmit="clearInput()">
+            <input type="text" name="url" id="urlInput" class="search-box" placeholder="URL...">
             <div class="checkbox-container">
                 <input type="checkbox" id="disable-js" name="js" value="0">
                 <label for="disable-js" class="checkbox-label">Disable JavaScript</label>
@@ -60,6 +60,14 @@
             <button type="submit" class="search-button">Render</button>
         </form>
     </div>
+
+    <script>
+        function clearInput() {
+            setTimeout(function () {
+                document.getElementById('urlInput').value = '';
+            }, 3000);
+        }
+    </script>
 </body>
 
 </html>

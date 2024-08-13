@@ -5,7 +5,7 @@ const pxyHTML = require("./handlers/pxy-html.js");
 
 const app = express();
 app.set("trust proxy", 1);
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 8080;
 
 app.use(express.static('public'));
 
