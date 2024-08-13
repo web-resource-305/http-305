@@ -5,10 +5,12 @@
   "main": "app.js",
   "repository": "https://github.com/web-resource-305/http-305",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev-setup": "node setup.js",
     "dev": "nodemon app.js",
+    "lint": "eslint .",
     "build": "npm install",
-    "start": "node app.js"
+    "start": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",

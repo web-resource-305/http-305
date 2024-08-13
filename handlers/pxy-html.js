@@ -37,26 +37,34 @@ const modifyURLs = (
         !resourceUrl.startsWith("https://")
       ) {  
         rewrittenUrl = new url.URL(resourceUrl, proxiedUrl).href;
-        logger.log('silly', `Relative URL detected.  Converting to absolute: (${resourceUrl} to ${rewrittenUrl})`);
+        logger.log("silly", `Relative URL detected.  Converting to absolute: (${resourceUrl} to ${rewrittenUrl})`);
       } else if (resourceUrl.startsWith(appHttpAddress)) {
-        logger.log('silly', `Site uses absolute URls for its resources: ${resourceUrl}`);
+        logger.log("silly", `Site uses absolute URls for its resources: ${resourceUrl}`);
         // Absolute URL that matches siteBaseDomain: Proxy it
         rewrittenUrl = resourceUrl;
       }
 
       if (rewrittenUrl) {
-        logger.log('silly', `Cleaned Resource URL: ${rewrittenUrl}}`);
+        logger.log("silly", `Cleaned Resource URL: ${rewrittenUrl}}`);
         const tagName = el.tagName.toLowerCase();
         let apiSlug;
         
-        if (tagName === "a" || (tagName === "form" && (!el.getAttribute("method") || el.getAttribute("method").toLowerCase() === "get"))) {
-        //if (tagName === "a" || tagName === "form") {
-          logger.log("silly", `Form method: ${el.getAttribute("method")}`);
-
+        // I don't want to handle proxying forms.  
+        // So make sure the method goes to the original site (see relative to absolute above)
+        if (tagName === "form") {
+          el.setAttribute(
+            attribute,
+            rewrittenUrl
+          );
+          return;
+        }
+        
+        if (tagName === "a") {
           apiSlug = jsEnabled ? "pxy/html" : "pxy/html/nojs";
         } else {
           apiSlug = "pxy/resource";
         } 
+
         if (rewrittenUrl && rewrittenUrl.endsWith(".pdf")) {
           apiSlug = "dl/pdf";
         }
@@ -68,13 +76,15 @@ const modifyURLs = (
           logger.debug(`Disabling script: ${rewrittenUrl}`);
           el.setAttribute(
             attribute,
-            ``
+            ""
           );
-        } else {
-          el.setAttribute(
-            attribute, proxiedResource
-          );
-        }
+          return;
+        } 
+        
+        el.setAttribute(
+          attribute, proxiedResource
+        );
+
       }
     }
   });
@@ -82,10 +92,10 @@ const modifyURLs = (
 
 const isValidUrl = (urlString) => {
   try {
-      new URL(urlString);
-      return true;
+    new URL(urlString);
+    return true;
   } catch (_) {
-      return false;
+    return false;
   }
 };
 
@@ -106,7 +116,7 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
   if (isValidUrl(addressToProxy)) {
     const urlToProxy = new URL(addressToProxy);
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.get('host');
+    const host = req.get("host");
     const appHttpAddress = `${protocol}://${host}`;
 
     logger.debug(`App Address: ${appHttpAddress}`);
@@ -176,12 +186,12 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
         jsEnabled
       );
 
+      // convert relative to absolute to break out of the proxy for forms
       modifyURLs(
         document.querySelectorAll("form"),
         "action",
         response.url,
-        appHttpAddress,
-        jsEnabled
+        appHttpAddress
       );
 
       return res.send(dom.serialize());
@@ -193,7 +203,7 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
     }
 
   } else {
-      logger.error("Invalid URL provided:", addressToProxy);
-      return res.status(400).send("Invalid URL");
+    logger.error("Invalid URL provided:", addressToProxy);
+    return res.status(400).send("Invalid URL");
   }
 };

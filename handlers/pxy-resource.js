@@ -20,10 +20,10 @@ const logger = createLogger({
 
 const isValidUrl = (urlString) => {
   try {
-      new URL(urlString);
-      return true;
+    new URL(urlString);
+    return true;
   } catch (_) {
-      return false;
+    return false;
   }
 };
 
@@ -74,48 +74,48 @@ module.exports = async (req, res, resourceToProxy, data) => {
 
       const ext = path.extname(filename).toLowerCase();
       switch (ext) {
-        case ".css":
-          res.setHeader("Content-Type", "text/css");
-          break;
-        case ".js":
-          res.setHeader("Content-Type", "application/javascript");
-          break;
-        case ".json":
-          res.setHeader("Content-Type", "application/json");
-          break;
-        case ".png":
-          res.setHeader("Content-Type", "image/png");
-          break;
-        case ".jpg":
-        case ".jpeg":
-          res.setHeader("Content-Type", "image/jpeg");
-          break;
-        case ".gif":
-          res.setHeader("Content-Type", "image/gif");
-          break;
-        case ".svg":
-          res.setHeader("Content-Type", "image/svg+xml");
-          break;
-        case ".woff":
-          res.setHeader("Content-Type", "font/woff");
-          break;
-        case ".woff2":
-          res.setHeader("Content-Type", "font/woff2");
-          break;
-        case ".ttf":
-          res.setHeader("Content-Type", "font/ttf");
-          break;
-        case ".eot":
-          res.setHeader("Content-Type", "application/vnd.ms-fontobject");
-          break;
-        case ".otf":
-          res.setHeader("Content-Type", "font/otf");
-          break;
-        case ".ico":
-          res.setHeader("Content-Type", "image/x-icon");
-          break;
-        default:
-          res.setHeader("Content-Type", "application/octet-stream");
+      case ".css":
+        res.setHeader("Content-Type", "text/css");
+        break;
+      case ".js":
+        res.setHeader("Content-Type", "application/javascript");
+        break;
+      case ".json":
+        res.setHeader("Content-Type", "application/json");
+        break;
+      case ".png":
+        res.setHeader("Content-Type", "image/png");
+        break;
+      case ".jpg":
+      case ".jpeg":
+        res.setHeader("Content-Type", "image/jpeg");
+        break;
+      case ".gif":
+        res.setHeader("Content-Type", "image/gif");
+        break;
+      case ".svg":
+        res.setHeader("Content-Type", "image/svg+xml");
+        break;
+      case ".woff":
+        res.setHeader("Content-Type", "font/woff");
+        break;
+      case ".woff2":
+        res.setHeader("Content-Type", "font/woff2");
+        break;
+      case ".ttf":
+        res.setHeader("Content-Type", "font/ttf");
+        break;
+      case ".eot":
+        res.setHeader("Content-Type", "application/vnd.ms-fontobject");
+        break;
+      case ".otf":
+        res.setHeader("Content-Type", "font/otf");
+        break;
+      case ".ico":
+        res.setHeader("Content-Type", "image/x-icon");
+        break;
+      default:
+        res.setHeader("Content-Type", "application/octet-stream");
       }
 
       return response.body.pipe(res).on("error", (err) => {
