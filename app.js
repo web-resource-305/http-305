@@ -18,11 +18,12 @@ app.get('/pxy', (req, res) => {
 // Handle HTML and resource proxying
 app.get("/pxy/html", (req, res) => {
     const country = req.get("CF-IPCountry");
-    const url = req.query.url;
+    const url = req.query.url ? req.query.url.trim() : '';
     const jsEnabled = req.query.js === '1' || req.query.js === 'true';
     const gbRedirect = req.query.ukred === '1' || req.query.ukred === 'true';
 
     if(country && country.toLowerCase() == "gb" && gbRedirect){
+        res.set('Referrer-Policy', 'no-referrer');
         res.redirect(url);
     }
 
@@ -34,28 +35,28 @@ app.get("/pxy/html", (req, res) => {
 
 // This has to come first
 app.get("/pxy/html/nojs/*", (req, res) => {
-    const uri = req.params[0];
-    if (!uri) {
+    const url = req.params[0] ? req.params[0].trim() : '';
+    if (!url) {
         return res.status(400).send("Please provide a URL");
     }
-    return pxyHTML(req, res, uri, false);
+    return pxyHTML(req, res, url, false);
 });
 // and this second
 app.get("/pxy/html/*", (req, res) => {
-    const uri = req.params[0];
-    if (!uri) {
+    const url = req.params[0] ? req.params[0].trim() : '';
+    if (!url) {
       return res.status(400).send("Please provide a URL");
     }
-    return pxyHTML(req, res, uri);
+    return pxyHTML(req, res, url);
 });
   
 // Use wildcard route to capture the full URL for resource proxying
 app.get("/pxy/resource/*", async (req, res) => {
-    const uri = req.params[0]; 
-    if (!uri) {
+    const url = req.params[0] ? req.params[0].trim() : '';
+    if (!url) {
         return res.status(400).send("Please provide a URL");
     }
-    return pxyResource(req, res, uri, req.body);
+    return pxyResource(req, res, url, req.body);
 });
   
 // Use wildcard route to capture the full URL for the PDF

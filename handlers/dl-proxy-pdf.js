@@ -19,26 +19,26 @@ const logger = createLogger({
   ],
 });
 
-module.exports = async (req, res, uri, data) => {
-  if (!uri) {
+module.exports = async (req, res, pefToProxy, data) => {
+  if (!pefToProxy) {
     logger.warn("Request missing URL parameter");
     return res.status(400).send("URL parameter is required");
   }
 
+  // Decode the URL if it was encoded
+  try {
+    pefToProxy = decodeURIComponent(pefToProxy);
+  } catch (e) {
+    logger.error("Error decoding resource URL:", e);
+    return res.status(400).send("Invalid resource URL encoding");
+  }
+
   try {
     // Log the incoming request
-    logger.info(`Fetching URL: ${uri}`);
-
-    // Decode the URI if it was encoded
-    try {
-      uri = decodeURIComponent(uri);
-    } catch (e) {
-      logger.error("Error decoding URI:", e);
-      return res.status(400).send("Invalid URL encoding");
-    }
+    logger.info(`Fetching URL: ${pefToProxy}`);
 
     // Fetch the file from the provided URL
-    const response = await fetch(uri, {
+    const response = await fetch(pefToProxy, {
       headers: {
         // Add any required headers here
       },
@@ -46,14 +46,14 @@ module.exports = async (req, res, uri, data) => {
 
     // Handle non-OK responses
     if (!response.ok) {
-      logger.error(`Failed to fetch URL: ${uri}, Status: ${response.status}`);
+      logger.error(`Failed to fetch URL: ${pefToProxy}, Status: ${response.status}`);
       return res
         .status(response.status)
         .send(`Failed to fetch URL: ${response.statusText}`);
     }
 
     // Extract the filename from the URI
-    const parsedUrl = url.parse(uri);
+    const parsedUrl = url.parse(pefToProxy);
     let filename = path.basename(parsedUrl.pathname) || "downloaded-file.pdf";
 
     // Ensure the filename has a .pdf extension

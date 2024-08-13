@@ -3,7 +3,7 @@ const { JSDOM } = require("jsdom");
 const { createLogger, transports, format } = require("winston");
 const url = require("url");
 
-// Set up logging ()
+// Set up logging (error, warn, info, http, verbose, debug, silly)
 const logger = createLogger({
   level: "info",
   format: format.combine(
@@ -35,18 +35,24 @@ const modifyURLs = (
       if (
         !resourceUrl.startsWith("http://") &&
         !resourceUrl.startsWith("https://")
-      ) {
+      ) {  
         rewrittenUrl = new url.URL(resourceUrl, proxiedUrl).href;
+        logger.log('silly', `Relative URL detected.  Converting to absolute: (${resourceUrl} to ${rewrittenUrl})`);
       } else if (resourceUrl.startsWith(appHttpAddress)) {
+        logger.log('silly', `Site uses absolute URls for its resources: ${resourceUrl}`);
         // Absolute URL that matches siteBaseDomain: Proxy it
         rewrittenUrl = resourceUrl;
       }
 
       if (rewrittenUrl) {
+        logger.log('silly', `Cleaned Resource URL: ${rewrittenUrl}}`);
         const tagName = el.tagName.toLowerCase();
         let apiSlug;
         
-        if (tagName === "a" || tagName === "form") {
+        if (tagName === "a" || (tagName === "form" && (!el.getAttribute("method") || el.getAttribute("method").toLowerCase() === "get"))) {
+        //if (tagName === "a" || tagName === "form") {
+          logger.log("silly", `Form method: ${el.getAttribute("method")}`);
+
           apiSlug = jsEnabled ? "pxy/html" : "pxy/html/nojs";
         } else {
           apiSlug = "pxy/resource";
@@ -55,21 +61,32 @@ const modifyURLs = (
           apiSlug = "dl/pdf";
         }
 
+        const proxiedResource =  `${appHttpAddress}/${apiSlug}/${encodeURIComponent(rewrittenUrl)}`;
+        logger.silly(`Proxied resource: ${proxiedResource}`);
+
         if (tagName == "script" && !jsEnabled) {
           logger.debug(`Disabling script: ${rewrittenUrl}`);
           el.setAttribute(
             attribute,
-            ``,
+            ``
           );
         } else {
           el.setAttribute(
-            attribute,
-            `/${apiSlug}/${encodeURIComponent(rewrittenUrl)}`,
+            attribute, proxiedResource
           );
         }
       }
     }
   });
+};
+
+const isValidUrl = (urlString) => {
+  try {
+      new URL(urlString);
+      return true;
+  } catch (_) {
+      return false;
+  }
 };
 
 module.exports = async (req, res, addressToProxy, jsEnabled) => {
@@ -78,7 +95,7 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
     return res.status(400).send("URL parameter is required");
   }
 
-  // Decode the URI if it was encoded
+  // Decode the URL if it was encoded
   try {
     addressToProxy = decodeURIComponent(addressToProxy);
   } catch (e) {
@@ -86,89 +103,97 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
     return res.status(400).send("Invalid URL encoding");
   }
 
-  const urlToProxy = new URL(addressToProxy);
-  const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-  const appHttpAddress = `${protocol}//${urlToProxy.hostname}`;
+  if (isValidUrl(addressToProxy)) {
+    const urlToProxy = new URL(addressToProxy);
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const host = req.get('host');
+    const appHttpAddress = `${protocol}://${host}`;
 
-  try {
+    logger.debug(`App Address: ${appHttpAddress}`);
     logger.info(`Fetching URL: ${urlToProxy.href}`);
 
-    // Fetch the HTML content from the provided URL
-    const response = await fetch(urlToProxy.href, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        "Accept-Language": "en-US",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        From: "googlebot(at)googlebot.com",
-        "Accept-Encoding": "gzip, deflate, br",
-      },
-    });
+    try {
+      // Fetch the HTML content from the provided URL
+      const response = await fetch(urlToProxy.href, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+          "Accept-Language": "en-US",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          From: "googlebot(at)googlebot.com",
+          "Accept-Encoding": "gzip, deflate, br",
+        },
+      });
 
-    // Handle non-OK responses
-    if (!response.ok) {
-      logger.error(
-        `Failed to fetch URL: ${urlToProxy.href}, Status: ${response.status}`,
+      // Handle non-OK responses
+      if (!response.ok) {
+        logger.error(
+          `Failed to fetch URL: ${urlToProxy.href}, Status: ${response.status}`,
+        );
+        return res
+          .status(response.status)
+          .send(`Failed to fetch URL: ${response.statusText}`);
+      }
+      logger.debug(`Address after any redirects: ${response.url}`);
+
+      // Fetch the HTML content
+      const html = await response.text();
+      // Modify the HTML content to proxy resource URLs
+      const dom = new JSDOM(html);
+      const document = dom.window.document;
+
+      modifyURLs(
+        document.querySelectorAll("img"),
+        "src",
+        response.url,
+        appHttpAddress
       );
-      return res
-        .status(response.status)
-        .send(`Failed to fetch URL: ${response.statusText}`);
+
+      modifyURLs(
+        // eslint-disable-next-line quotes
+        document.querySelectorAll('link[rel="stylesheet"]'),
+        "href",
+        response.url,
+        appHttpAddress,
+      );
+
+      modifyURLs(
+        document.querySelectorAll("script"),
+        "src",
+        response.url,
+        appHttpAddress,
+        jsEnabled
+      );
+
+      modifyURLs(
+        document.querySelectorAll("a"),
+        "href",
+        response.url,
+        appHttpAddress,
+        jsEnabled
+      );
+
+      modifyURLs(
+        document.querySelectorAll("form"),
+        "action",
+        response.url,
+        appHttpAddress,
+        jsEnabled
+      );
+
+      return res.send(dom.serialize());
+    } catch (error) {
+      logger.error("Error fetching or modifying HTML:", error);
+      if (!res.headersSent) {
+        return res.status(500).send("Internal Server Error");
+      } 
     }
 
-    // Fetch the HTML content
-    const html = await response.text();
-    const proxiedUrl = response.url; // The value after any redirects
-    // Modify the HTML content to proxy resource URLs
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
-
-    modifyURLs(
-      document.querySelectorAll("img"),
-      "src",
-      proxiedUrl,
-      appHttpAddress
-    );
-
-    modifyURLs(
-      // eslint-disable-next-line quotes
-      document.querySelectorAll('link[rel="stylesheet"]'),
-      "href",
-      proxiedUrl,
-      appHttpAddress,
-    );
-
-    modifyURLs(
-      document.querySelectorAll("script"),
-      "src",
-      proxiedUrl,
-      appHttpAddress,
-      jsEnabled
-    );
-
-    modifyURLs(
-      document.querySelectorAll("a"),
-      "href",
-      proxiedUrl,
-      appHttpAddress,
-      jsEnabled
-    );
-
-    modifyURLs(
-      document.querySelectorAll("form"),
-      "action",
-      proxiedUrl,
-      appHttpAddress,
-      jsEnabled
-    );
-
-    return res.send(dom.serialize());
-  } catch (error) {
-    logger.error("Error fetching or modifying HTML:", error);
-    if (!res.headersSent) {
-      return res.status(500).send("Internal Server Error");
-    } 
+  } else {
+      logger.error("Invalid URL provided:", addressToProxy);
+      return res.status(400).send("Invalid URL");
   }
 };
