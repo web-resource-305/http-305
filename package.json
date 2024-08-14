@@ -17,6 +17,7 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.19.2",
+    "express-handlebars": "^8.0.1",
     "jsdom": "^24.1.1",
     "node-fetch": "^2.7.0",
     "winston": "^3.14.1"

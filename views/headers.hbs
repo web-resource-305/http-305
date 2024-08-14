@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Headers</title>
+    <style>
+        table {
+            width: 95%;
+            border-collapse: collapse;
+            word-break: break-all; /* Break words at any character to avoid overflow */
+            white-space: pre-wrap; /* Maintain formatting and wrap text */
+        }
+
+        th, td {
+            padding: 8px 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+
+</head>
+<body>
+    <h1>Request Headers</h1>
+    <table>
+        <tr>
+            <th style="width: 180px">Header</th>
+            <th>Value</th>
+        </tr>
+        {{#each headers}}
+        <tr>
+            <td>{{@key}}</td>
+            <td>{{{breakLines (decodeURIComponent this)}}}</td>
+        </tr>
+        {{/each}}
+    </table>
+</body>
+</html>

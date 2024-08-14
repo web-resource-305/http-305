@@ -1,4 +1,5 @@
 const express = require("express");
+const hbs = require("express-handlebars");
 const { createLogger, transports, format } = require("winston");
 const pxyResource = require("./handlers/pxy-resource.js");
 const dlProxyPDF = require("./handlers/dl-proxy-pdf.js");
@@ -19,16 +20,43 @@ const logger = createLogger({
   ],
 });
 
+const port = process.env.PORT || 8080;
+
 const app = express();
 app.set("trust proxy", 1);
-const port = process.env.PORT || 8080;
 app.use(express.static("public"));
+app.engine("hbs", hbs.engine({
+  extname: ".hbs",
+  partialsDir: "views/partials/", // Specify the partials directory
+  helpers: {
+    // Custom helper to replace semicolons with semicolon and line break
+    breakLines: function (text) {
+      return text.replace(/;/g, ";<br>");
+    },
+    decodeURIComponent: function (text) {
+      return decodeURIComponent(text);
+    }
+  }
+}));
+app.set("view engine", "hbs");
+app.set("views", "./views");
+
+// Custom error handler middleware
+app.use((err, req, res, next) => {
+  logger.error(`Error encountered: ${err.message}`);
+  res.status(err.status || 500).send(`Internal Server Error: ${err.message}`);
+});
+
+// Useful for keepalive 
+app.get("/ping", (req, res) => {
+  res.render("headers", { 
+    headers: req.headers,  layout: false });
+});
 
 // Define a simple route
 app.get("/pxy", (req, res) => {
   const country = req.get("CF-IPCountry");
-  logger.info(`Request Headers to /pxy (${country})`);
-  logger.info(req.headers);
+  logger.info(`Request Headers to /pxy (${country}): ${JSON.stringify(req.headers, null, 2)}`);
   
   return res.status(200).send(`Welcome to HTTP 305 (${country})`);
 });
