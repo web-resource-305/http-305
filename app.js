@@ -65,8 +65,10 @@ app.get("/pxy", (req, res) => {
 app.get("/pxy/html", (req, res) => {
   const country = req.get("CF-IPCountry");
   const url = req.query.url ? req.query.url.trim() : "";
-  const jsEnabled = req.query.js === "1" || req.query.js === "true";
+  const jsDisabled = req.query.js === "1" || req.query.js === "true";
   const gbRedirect = req.query.ukred === "1" || req.query.ukred === "true";
+
+  logger.info(`jsEnabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
 
   if(country && country.toLowerCase() == "gb" && gbRedirect){
     res.set("Referrer-Policy", "no-referrer");
@@ -76,7 +78,7 @@ app.get("/pxy/html", (req, res) => {
   if (!url) {
     return res.status(400).send("Please provide a URL");
   }
-  return pxyHTML(req, res, url, jsEnabled);
+  return pxyHTML(req, res, url, jsDisabled);
 });
 
 // This has to come first
@@ -85,7 +87,7 @@ app.get("/pxy/html/nojs/*", (req, res) => {
   if (!url) {
     return res.status(400).send("Please provide a URL");
   }
-  return pxyHTML(req, res, url, false);
+  return pxyHTML(req, res, url, true);
 });
 // and this second
 app.get("/pxy/html/*", (req, res) => {

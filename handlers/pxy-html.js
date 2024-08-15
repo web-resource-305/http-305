@@ -23,7 +23,7 @@ const modifyURLs = (
   attribute,
   proxiedUrl,
   appHttpAddress,
-  jsEnabled = true
+  jsDisabled = false
 ) => {
   elements.forEach((el) => {
     const resourceUrl = el.getAttribute(attribute);
@@ -60,7 +60,7 @@ const modifyURLs = (
         }
         
         if (tagName === "a") {
-          apiSlug = jsEnabled ? "pxy/html" : "pxy/html/nojs";
+          apiSlug = jsDisabled ? "pxy/html/nojs" : "pxy/html";
         } else {
           apiSlug = "pxy/resource";
         } 
@@ -72,7 +72,7 @@ const modifyURLs = (
         const proxiedResource =  `${appHttpAddress}/${apiSlug}/${encodeURIComponent(rewrittenUrl)}`;
         logger.silly(`Proxied resource: ${proxiedResource}`);
 
-        if (tagName == "script" && !jsEnabled) {
+        if (tagName == "script" && jsDisabled) {
           logger.debug(`Disabling script: ${rewrittenUrl}`);
           el.setAttribute(
             attribute,
@@ -99,7 +99,7 @@ const isValidUrl = (urlString) => {
   }
 };
 
-module.exports = async (req, res, addressToProxy, jsEnabled) => {
+module.exports = async (req, res, addressToProxy, jsDisabled) => {
   if (!addressToProxy) {
     logger.warn("Request missing URL parameter");
     return res.status(400).send("URL parameter is required");
@@ -175,7 +175,7 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
         "src",
         response.url,
         appHttpAddress,
-        jsEnabled
+        jsDisabled
       );
 
       modifyURLs(
@@ -183,7 +183,7 @@ module.exports = async (req, res, addressToProxy, jsEnabled) => {
         "href",
         response.url,
         appHttpAddress,
-        jsEnabled
+        jsDisabled
       );
 
       // convert relative to absolute to break out of the proxy for forms
