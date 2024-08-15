@@ -68,7 +68,7 @@ app.get("/pxy/html", (req, res) => {
   const jsDisabled = req.query.js === "1" || req.query.js === "true";
   const gbRedirect = req.query.ukred === "1" || req.query.ukred === "true";
 
-  logger.info(`jsEnabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
+  logger.info(`jsDisabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
 
   if(country && country.toLowerCase() == "gb" && gbRedirect){
     res.set("Referrer-Policy", "no-referrer");
