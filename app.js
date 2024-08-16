@@ -5,9 +5,11 @@ const pxyResource = require("./handlers/pxy-resource.js");
 const dlProxyPDF = require("./handlers/dl-proxy-pdf.js");
 const pxyHTML = require("./handlers/pxy-html.js");
 
+require("dotenv").config(); // Load environment variables from .env
+
 // Set up logging (error, warn, info, http, verbose, debug, silly)
 const logger = createLogger({
-  level: "info",
+  level: process.env.LOG_LEVEL || "info", // Default to "info" if LOG_LEVEL is not set
   format: format.combine(
     format.timestamp(),
     format.printf(
@@ -20,6 +22,7 @@ const logger = createLogger({
   ],
 });
 
+logger.info(`Logging level: ${logger.level}`);
 const port = process.env.PORT || 8080;
 
 const app = express();
@@ -68,7 +71,7 @@ app.get("/pxy/html", (req, res) => {
   const jsDisabled = req.query.js === "0" || req.query.js === "false";
   const gbRedirect = req.query.ukred === "1" || req.query.ukred === "true";
 
-  logger.info(`jsDisabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
+  logger.debug(`jsDisabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
 
   if(country && country.toLowerCase() == "gb" && gbRedirect){
     res.set("Referrer-Policy", "no-referrer");

@@ -4,9 +4,11 @@ const { createLogger, transports, format } = require("winston");
 const path = require("path");
 const url = require("url");
 
+require("dotenv").config(); // Load environment variables from .env
+
 // Set up logging
 const logger = createLogger({
-  level: "info",
+  level: process.env.LOG_LEVEL || "info", // Default to "info" if LOG_LEVEL is not set
   format: format.combine(
     format.timestamp(),
     format.printf(

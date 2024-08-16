@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = ".env";
 
 const envContent = `
+LOG_LEVEL=debug
 # Add your environment variables here
 `;
 

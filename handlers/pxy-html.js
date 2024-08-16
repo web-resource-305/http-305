@@ -3,9 +3,11 @@ const { JSDOM } = require("jsdom");
 const { createLogger, transports, format } = require("winston");
 const url = require("url");
 
+require("dotenv").config(); // Load environment variables from .env
+
 // Set up logging (error, warn, info, http, verbose, debug, silly)
 const logger = createLogger({
-  level: "info",
+  level: process.env.LOG_LEVEL || "info", // Default to "info" if LOG_LEVEL is not set
   format: format.combine(
     format.timestamp(),
     format.printf(
