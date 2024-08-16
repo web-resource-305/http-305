@@ -65,7 +65,7 @@ app.get("/pxy", (req, res) => {
 app.get("/pxy/html", (req, res) => {
   const country = req.get("CF-IPCountry");
   const url = req.query.url ? req.query.url.trim() : "";
-  const jsDisabled = req.query.js === "1" || req.query.js === "true";
+  const jsDisabled = req.query.js === "0" || req.query.js === "false";
   const gbRedirect = req.query.ukred === "1" || req.query.ukred === "true";
 
   logger.info(`jsDisabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
