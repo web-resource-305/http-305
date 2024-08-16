@@ -73,14 +73,16 @@ app.get("/pxy/html", (req, res) => {
 
   logger.debug(`jsDisabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
 
-  if(country && country.toLowerCase() == "gb" && gbRedirect){
-    res.set("Referrer-Policy", "no-referrer");
-    res.redirect(url);
-  }
-
   if (!url) {
     return res.status(400).send("Please provide a URL");
   }
+
+  if(country && country.toLowerCase() == "gb" && gbRedirect){
+    res.set("Referrer-Policy", "no-referrer");
+    res.redirect(url);
+    return;
+  }
+
   return pxyHTML(req, res, url, jsDisabled);
 });
 
