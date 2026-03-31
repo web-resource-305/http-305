@@ -1,5 +1,6 @@
 const express = require("express");
 const hbs = require("express-handlebars");
+const rateLimit = require("express-rate-limit");
 const logger = require("./lib/logger");
 const pxyResource = require("./handlers/pxy-resource.js");
 const pxyDl = require("./handlers/pxy-dl.js");
@@ -11,6 +12,12 @@ const port = process.env.PORT || 8080;
 
 const app = express();
 app.set("trust proxy", 1);
+app.use("/pxy", rateLimit({
+  windowMs: 60_000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
 app.use(express.static("public"));
 app.engine("hbs", hbs.engine({
   extname: ".hbs",

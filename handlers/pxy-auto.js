@@ -63,6 +63,7 @@ module.exports = async (req, res, urlToProxy) => {
       const rewritten = rewriteHTML(html, response.url, appHttpAddress, jsDisabled);
       res.set({
         "Content-Type": "text/html; charset=utf-8",
+        "Content-Security-Policy": "default-src 'self'; img-src *; media-src *; style-src 'self' 'unsafe-inline' *; font-src *; frame-src 'self'",
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
       });
