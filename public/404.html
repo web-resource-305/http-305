@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 — HTTP 305</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#153a59">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #153a59;
+            --surface: #1b4568;
+            --surface-hover: #1f5078;
+            --border: #265a80;
+            --border-focus: #f0508a;
+            --accent: #f0508a;
+            --accent-hover: #d94478;
+            --text: #efeff1;
+            --text-muted: #8eafc4;
+            --radius: 12px;
+            --glow: 0 0 20px rgba(240, 80, 138, 0.15);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 600px;
+            height: 600px;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(240, 80, 138, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 520px;
+            padding: 40px 36px 36px;
+            margin: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+
+        .logo h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .logo h1 span {
+            color: var(--accent);
+        }
+
+        .error-code {
+            font-size: 96px;
+            font-weight: 800;
+            color: var(--accent);
+            margin: 24px 0 8px;
+            line-height: 1;
+            letter-spacing: -2px;
+            opacity: 0.85;
+        }
+
+        .tagline {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 16px;
+        }
+
+        .message {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin: 0 0 28px;
+            max-width: 380px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .home-btn {
+            display: inline-block;
+            padding: 14px 32px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+            letter-spacing: 0.3px;
+        }
+
+        .home-btn:hover {
+            background: var(--accent-hover);
+            box-shadow: var(--glow);
+        }
+
+        .home-btn:active {
+            transform: scale(0.98);
+        }
+
+        .footer {
+            margin-top: 24px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .quip {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-style: italic;
+            margin: 0 0 24px;
+        }
+
+        @media (max-width: 480px) {
+            .card {
+                padding: 28px 20px 24px;
+                margin: 12px;
+            }
+
+            .logo h1 {
+                font-size: 24px;
+            }
+
+            .error-code {
+                font-size: 72px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="logo">
+            <h1>HTTP <span>305</span></h1>
+        </div>
+
+        <div class="error-code">404</div>
+        <p class="tagline">Use Proxy... not for this URL ;-)</p>
+        <p class="message">
+            We're HTTP 305 &mdash; we proxy things. But even we can't proxy a page
+            that doesn't exist. That's not a redirect, that's delusion.
+        </p>
+        <p class="quip" id="quip"></p>
+
+        <a href="/" class="home-btn">302 Me Home</a>
+
+        <div class="footer">
+            <p>Status 305: Use Proxy &bull; Status 404: Use a better URL</p>
+        </div>
+    </div>
+
+    <script>
+        var quips = [
+            "305 means 'Use Proxy'. 404 means 'Use a different URL'.",
+            "We proxied your request successfully. The void responded.",
+            "This page returned a 301 to /dev/null.",
+            "HTTP 200 OK... just kidding. 404.",
+            "Even Googlebot couldn't find this one. And we asked nicely.",
+            "Attempted 305 Use Proxy \u2192 502 Bad Gateway \u2192 504 Timeout \u2192 gave up.",
+            "Our proxy fetched this page. Content-Type: disappointment/plain.",
+            "We rewrote every URL on this page. There were zero. This is it.",
+            "The upstream server responded: 'new phone, who dis?'",
+            "This route has no handler. It had dreams once. Then Express said no.",
+            "We're a proxy, not a miracle worker. Try a URL that exists.",
+            "Location: /nowhere. Status: 404. Mood: 418 I'm a teapot.",
+            "The request completed in 0ms. Because there was nothing to do.",
+            "Cache miss. R2 miss. Upstream miss. Hat trick of nothing.",
+            "RFC 7231 says 305 means 'Use Proxy'. It says nothing about finding this page.",
+        ];
+        document.getElementById("quip").textContent = quips[Math.floor(Math.random() * quips.length)];
+    </script>
+</body>
+
+</html>

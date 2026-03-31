@@ -1,0 +1,168 @@
+const express = require("express");
+const hbs = require("express-handlebars");
+const logger = require("./lib/logger");
+const pxyResource = require("./handlers/pxy-resource.js");
+const pxyDl = require("./handlers/pxy-dl.js");
+const pxyAuto = require("./handlers/pxy-auto.js");
+const pxyHTML = require("./handlers/pxy-html.js");
+
+logger.info(`Logging level: ${logger.level}`);
+const port = process.env.PORT || 8080;
+
+const app = express();
+app.set("trust proxy", 1);
+app.use(express.static("public"));
+app.engine("hbs", hbs.engine({
+  extname: ".hbs",
+  partialsDir: "views/partials/",
+  helpers: {
+    breakLines: function (text) {
+      return text.replace(/;/g, ";\n");
+    },
+    decodeURIComponent: function (text) {
+      return decodeURIComponent(text);
+    }
+  }
+}));
+app.set("view engine", "hbs");
+app.set("views", "./views");
+
+// Handle HTML and resource proxying
+app.get("/pxy/html", async (req, res) => {
+  try {
+    const country = req.get("CF-IPCountry");
+    const url = req.query.url ? req.query.url.trim() : "";
+    const jsDisabled = req.query.js === "0" || req.query.js === "false";
+    const gbRedirect = req.query.ukred === "1" || req.query.ukred === "true";
+
+    logger.debug(`jsDisabled: ${jsDisabled}, gbRedirect: ${gbRedirect}`);
+
+    if (!url) {
+      return res.status(400).send("Please provide a URL");
+    }
+
+    if (country && country.toLowerCase() === "gb" && gbRedirect) {
+      res.set("Referrer-Policy", "no-referrer");
+      return res.redirect(url);
+    }
+
+    return await pxyHTML(req, res, url, jsDisabled);
+  } catch (err) {
+    logger.error(`Error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(err.status || 500)
+        .send(err.status ? err.message : "Internal Server Error");
+    }
+  }
+});
+
+// This has to come first
+app.get("/pxy/html/nojs/*", async (req, res) => {
+  try {
+    const url = req.params[0] ? req.params[0].trim() : "";
+    if (!url) {
+      return res.status(400).send("Please provide a URL");
+    }
+    return await pxyHTML(req, res, url, true);
+  } catch (err) {
+    logger.error(`Error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(err.status || 500)
+        .send(err.status ? err.message : "Internal Server Error");
+    }
+  }
+});
+// and this second
+app.get("/pxy/html/*", async (req, res) => {
+  try {
+    const url = req.params[0] ? req.params[0].trim() : "";
+    if (!url) {
+      return res.status(400).send("Please provide a URL");
+    }
+    return await pxyHTML(req, res, url);
+  } catch (err) {
+    logger.error(`Error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(err.status || 500)
+        .send(err.status ? err.message : "Internal Server Error");
+    }
+  }
+});
+
+// Use wildcard route to capture pass-through static asset (CSS, JS, image, font, etc.)
+// and streams them with the correct MIME type (No parsing, no rewriting).
+app.get("/pxy/resource/*", async (req, res) => {
+  try {
+    const url = req.params[0] ? req.params[0].trim() : "";
+    if (!url) {
+      return res.status(400).send("Please provide a URL");
+    }
+    return await pxyResource(req, res, url);
+  } catch (err) {
+    logger.error(`Error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(err.status || 500)
+        .send(err.status ? err.message : "Internal Server Error");
+    }
+  }
+});
+
+// Download handler for files (PDF, DOCX, PPTX, XLSX, etc.)
+app.get("/pxy/dl/*", async (req, res) => {
+  try {
+    logger.info("Invoked downloader");
+    const uri = req.params[0] ? req.params[0].trim() : "";
+    if (!uri) {
+      return res.status(400).send("Please provide a URL");
+    }
+    return await pxyDl(req, res, uri);
+  } catch (err) {
+    logger.error(`Error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(err.status || 500)
+        .send(err.status ? err.message : "Internal Server Error");
+    }
+  }
+});
+
+// Auto-detect content type and serve accordingly (HTML, download, or stream)
+// Catch-all: must come after /pxy/html, /pxy/resource, /pxy/dl
+app.get("/pxy/*", async (req, res) => {
+  try {
+    const url = req.params[0] ? req.params[0].trim() : "";
+    if (!url) {
+      return res.status(400).send("Please provide a URL");
+    }
+    return await pxyAuto(req, res, url);
+  } catch (err) {
+    logger.error(`Error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(err.status || 500)
+        .send(err.status ? err.message : "Internal Server Error");
+    }
+  }
+});
+
+// Useful for keepalive
+app.get("/ping", (req, res) => {
+  res.render("headers", {
+    headers: req.headers, layout: false });
+});
+
+// 404 catch-all (must be after all routes, before error handler)
+app.use((req, res) => {
+  res.status(404).sendFile("404.html", { root: "public" });
+});
+
+// Custom error handler middleware (must be after routes — Express requires all 4 params)
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  logger.error(`Error encountered: ${err.message}`);
+  res.status(err.status || 500).send("Internal Server Error");
+});
+
+// Start the server
+const server = app.listen(port, () => logger.info(`http://localhost:${port}`));
+
+server.keepAliveTimeout = 120 * 1000;
+server.headersTimeout = 120 * 1000;
