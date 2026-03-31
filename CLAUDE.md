@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 HTTP-305 is a "12 Foot Ladder style" HTTP proxy — a Node.js/Express server that fetches web pages and rewrites all internal URLs to route through itself, enabling transparent proxying of HTML, static resources, and downloadable files (PDF, DOCX, PPTX, XLSX, etc.).
 
-Deployed on Render.com (free tier). GitHub: https://github.com/web-resource-305/http-305
+Deployed on Render.com: https://http-305.onrender.com
+GitHub: https://github.com/web-resource-305/http-305
 
 ## Commands
 
