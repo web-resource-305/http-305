@@ -15,7 +15,8 @@ const ensureCacheDir = () => {
 };
 
 const getCachePath = (url, ext) => {
-  const hash = crypto.createHash("sha256").update(url).digest("hex");
+  const normalized = new URL(url).href;
+  const hash = crypto.createHash("sha256").update(normalized).digest("hex");
   return path.join(CACHE_DIR, `${hash}${ext}`);
 };
 
