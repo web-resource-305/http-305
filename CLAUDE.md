@@ -91,6 +91,7 @@ On R2 hit, the file is restored to local cache for future fast access.
 | `R2_ACCESS_KEY_ID` | (none) | R2 access key (enables R2 cache when set) |
 | `R2_SECRET_ACCESS_KEY` | (none) | R2 secret key |
 | `R2_BUCKET_NAME` | (none) | R2 bucket name for cached files |
+| `DL_ALLOWED_CIDRS` | (none) | Comma-separated IPv4 CIDRs allowed to use `/pxy/dl/` and auto-download (unset = allow all) |
 
 ## Code Style
 

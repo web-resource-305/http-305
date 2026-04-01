@@ -17,6 +17,10 @@ LOG_LEVEL=debug
 # R2_ACCESS_KEY_ID=
 # R2_SECRET_ACCESS_KEY=
 # R2_BUCKET_NAME=
+
+# IP allowlist for /pxy/dl/ downloads (comma-separated CIDRs, e.g. 1.2.3.0/24,5.6.7.8)
+# When set, only matching IPs can trigger download caching. Unset = allow all.
+# DL_ALLOWED_CIDRS=
 `;
 
 if (!fs.existsSync(path)) {

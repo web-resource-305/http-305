@@ -114,6 +114,23 @@ app.get("/pxy/resource/*", async (req, res) => {
   }
 });
 
+// Download by cache hash key (read-only, no upstream fetch)
+app.get("/pxy/dl/hash/*", async (req, res) => {
+  try {
+    const key = req.params[0] ? req.params[0].trim() : "";
+    if (!key) {
+      return res.status(400).send("Please provide a cache key");
+    }
+    return await pxyDl.hashHandler(req, res, key);
+  } catch (err) {
+    logger.error(`Error: ${err.message}`);
+    if (!res.headersSent) {
+      res.status(err.status || 500)
+        .send(err.status ? err.message : "Internal Server Error");
+    }
+  }
+});
+
 // Download handler for files (PDF, DOCX, PPTX, XLSX, etc.)
 app.get("/pxy/dl/*", async (req, res) => {
   try {
