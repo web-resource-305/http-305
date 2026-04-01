@@ -10,8 +10,6 @@ const fetchUrl = require("../lib/fetch-url");
 const isValidUrl = require("../lib/validate-url");
 const { parseMime, isDownloadable, isHTML } = require("../lib/content-types");
 const { rewriteHTML } = require("../lib/html-rewriter");
-const { serveDownload } = require("./pxy-dl");
-const cidr = require("../lib/cidr");
 
 /**
  * @param {import('express').Request} req
@@ -72,12 +70,8 @@ module.exports = async (req, res, urlToProxy) => {
     }
 
     if (isDownloadable(mime)) {
-      // Serve as attachment download; only write to cache if IP is allowed
-      const canWrite = cidr.isAllowed(req.ip);
-      if (!canWrite) {
-        logger.info(`CIDR read-only: ${req.ip} on auto-download`);
-      }
-      return await serveDownload(res, urlToProxy, response, mime, canWrite);
+      // Redirect to /pxy/dl/ so the download goes through the rate-limited endpoint
+      return res.redirect(`/pxy/dl/${encodeURIComponent(urlToProxy)}`);
     }
 
     // Default: stream as resource with upstream Content-Type

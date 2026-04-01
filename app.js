@@ -12,7 +12,7 @@ const port = process.env.PORT || 8080;
 
 const app = express();
 app.set("trust proxy", 1);
-app.use("/pxy", rateLimit({
+app.use("/pxy/dl", rateLimit({
   windowMs: 60_000,
   max: 60,
   standardHeaders: true,
@@ -166,6 +166,9 @@ app.get("/pxy/*", async (req, res) => {
     }
   }
 });
+
+// Cache API — ensure a downloadable is cached and return JSON metadata (CIDR-protected)
+app.get("/api/cache", pxyDl.cacheHandler);
 
 // Useful for keepalive
 app.get("/ping", (req, res) => {

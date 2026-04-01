@@ -33,6 +33,47 @@ const writeToLocalCache = (cachePath, buffer) => {
   fs.renameSync(tmpPath, cachePath);
 };
 
+const getMetaPath = (cachePath) => cachePath + ".meta";
+
+const writeMetadata = (cachePath, metadata) => {
+  try {
+    fs.writeFileSync(getMetaPath(cachePath), JSON.stringify(metadata));
+  } catch (err) {
+    logger.warn(`Failed to write metadata: ${err.message}`);
+  }
+};
+
+const readMetadata = (cachePath) => {
+  try {
+    const metaPath = getMetaPath(cachePath);
+    if (fs.existsSync(metaPath)) {
+      return JSON.parse(fs.readFileSync(metaPath, "utf8"));
+    }
+  } catch (err) {
+    logger.warn(`Failed to read metadata: ${err.message}`);
+  }
+  return null;
+};
+
+/**
+ * Derive a human-readable filename from the original source URL.
+ */
+const deriveDisplayName = (sourceUrl, ext) => {
+  if (!sourceUrl) return null;
+  try {
+    const parsed = new URL(sourceUrl);
+    let name = path.basename(parsed.pathname);
+    if (!name || name === "/") return null;
+    const currentExt = path.extname(name).toLowerCase();
+    if (ext && currentExt !== ext) {
+      name += ext;
+    }
+    return name.replace(/[^\w.\-]/g, "_");
+  } catch {
+    return null;
+  }
+};
+
 const resolveDownloadMime = (url, responseMime) => {
   // Prefer the upstream Content-Type if it maps to a known download type
   const ext = getExtensionForMime(responseMime);
@@ -84,6 +125,7 @@ const serveDownload = async (res, url, response, detectedMime, canWrite = true) 
         // Restore to local cache
         try {
           writeToLocalCache(cachePath, fileBuffer);
+          writeMetadata(cachePath, { sourceUrl: url });
           logger.info(`Restored from R2 to local cache: ${cachePath}`);
         } catch (restoreErr) {
           logger.warn(`Failed to restore to local cache: ${restoreErr.message}`);
@@ -111,6 +153,7 @@ const serveDownload = async (res, url, response, detectedMime, canWrite = true) 
     if (canWrite) {
       try {
         writeToLocalCache(cachePath, fileBuffer);
+        writeMetadata(cachePath, { sourceUrl: url });
         logger.info(`Cached file: ${cachePath}`);
       } catch (cacheErr) {
         logger.warn(`Failed to cache file: ${cacheErr.message}`);
@@ -209,6 +252,7 @@ const handler = async (req, res, urlToDownload) => {
         if (r2Result) {
           try {
             writeToLocalCache(cachePath, r2Result.buffer);
+            writeMetadata(cachePath, { sourceUrl: urlToDownload });
             logger.info(`R2 early restore: ${cachePath}`);
           } catch (restoreErr) {
             logger.warn(`R2 early restore failed: ${restoreErr.message}`);
@@ -299,8 +343,10 @@ const hashHandler = async (req, res, cacheKey) => {
   if (fs.existsSync(cachePath)) {
     logger.info(`Hash lookup local hit: ${filename}`);
     const stat = fs.statSync(cachePath);
+    const meta = readMetadata(cachePath);
+    const displayName = deriveDisplayName(meta && meta.sourceUrl, ext) || filename;
     res.setHeader("Content-Type", mime);
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${displayName}"`);
     res.setHeader("Content-Length", stat.size);
     res.setHeader("X-Cache", "local");
     res.setHeader("X-Cached-At", stat.mtime.toISOString());
@@ -331,14 +377,20 @@ const hashHandler = async (req, res, cacheKey) => {
           // Restore to local cache
           try {
             writeToLocalCache(resolvedPath, r2Result.buffer);
+            const r2SourceUrl = r2Result.metadata["x-source-url"];
+            if (r2SourceUrl) {
+              writeMetadata(resolvedPath, { sourceUrl: r2SourceUrl });
+            }
           } catch (restoreErr) {
             logger.warn(`R2 restore failed: ${restoreErr.message}`);
           }
 
+          const r2SourceUrl = r2Result.metadata["x-source-url"];
+          const displayName = deriveDisplayName(r2SourceUrl, resolvedExt) || r2Key;
           const r2Mime = r2Result.metadata["x-mime"]
             || (resolvedExt ? getMimeForExtension(resolvedExt) : "application/octet-stream");
           res.setHeader("Content-Type", r2Mime);
-          res.setHeader("Content-Disposition", `attachment; filename="${r2Key}"`);
+          res.setHeader("Content-Disposition", `attachment; filename="${displayName}"`);
           res.setHeader("Content-Length", r2Result.buffer.length);
           res.setHeader("X-Cache", "r2");
           if (r2Result.metadata["x-cached-at"]) {
@@ -356,6 +408,142 @@ const hashHandler = async (req, res, cacheKey) => {
   return res.status(404).send("Not found in cache");
 };
 
+/**
+ * API handler for /api/cache?url=<URL> — ensures a downloadable resource is
+ * cached and returns JSON metadata. CIDR-protected, no rate limit.
+ */
+const cacheHandler = async (req, res) => {
+  if (!cidr.isAllowed(req.ip)) {
+    logger.warn(`CIDR deny: ${req.ip} on /api/cache`);
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const url = req.query.url ? req.query.url.trim() : "";
+  if (!url) {
+    return res.status(400).json({ error: "url query parameter is required" });
+  }
+
+  if (!isValidUrl(url)) {
+    return res.status(400).json({ error: "Invalid URL" });
+  }
+
+  const parsedUrl = new URL(url);
+
+  try {
+    // Resolve MIME from URL extension hint
+    const urlExt = path.extname(parsedUrl.pathname).toLowerCase();
+    const hintMime = getMimeForExtension(urlExt);
+    const hintExt = getExtensionForMime(hintMime);
+
+    // Helper to build the JSON response
+    const buildResponse = (hash, ext, mime, size, cachedAt, source) => ({
+      url,
+      hash,
+      mime,
+      ext,
+      size,
+      cachedAt,
+      source,
+      hashUrl: `/pxy/dl/hash/${hash}${ext}`,
+      downloadUrl: `/pxy/dl/${encodeURIComponent(url)}`,
+    });
+
+    // Tier 1: Local cache
+    if (hintExt) {
+      const cachePath = getCachePath(url, hintExt);
+      if (fs.existsSync(cachePath)) {
+        const hash = path.basename(cachePath, hintExt);
+        const stat = fs.statSync(cachePath);
+        return res.json(buildResponse(
+          hash, hintExt, hintMime, stat.size, stat.mtime.toISOString(), "local"
+        ));
+      }
+
+      // Tier 2: R2
+      if (r2Cache.enabled) {
+        const r2Key = getR2Key(cachePath);
+        try {
+          const r2Result = await r2Cache.get(r2Key);
+          if (r2Result) {
+            const hash = path.basename(cachePath, hintExt);
+            try {
+              writeToLocalCache(cachePath, r2Result.buffer);
+              writeMetadata(cachePath, { sourceUrl: url });
+            } catch (restoreErr) {
+              logger.warn(`R2 restore failed: ${restoreErr.message}`);
+            }
+            const r2Mime = r2Result.metadata["x-mime"] || hintMime;
+            return res.json(buildResponse(
+              hash, hintExt, r2Mime, r2Result.buffer.length,
+              r2Result.metadata["x-cached-at"] || new Date().toISOString(), "r2"
+            ));
+          }
+        } catch (r2Err) {
+          logger.warn(`R2 check failed: ${r2Err.message}`);
+        }
+      }
+    }
+
+    // Tier 3: Upstream fetch
+    const response = await fetchUrl(parsedUrl.href);
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Upstream returned ${response.status}: ${response.statusText}`,
+      });
+    }
+
+    const contentType = response.headers.get("content-type");
+    const mime = parseMime(contentType) || hintMime;
+
+    const resolved = resolveDownloadMime(url, mime);
+    if (!isDownloadable(resolved.mime)) {
+      return res.status(415).json({
+        error: `Unsupported file type: ${resolved.mime}`,
+      });
+    }
+
+    const contentLength = Number(response.headers.get("content-length"));
+    if (contentLength && contentLength > MAX_DOWNLOAD_SIZE) {
+      return res.status(413).json({
+        error: `File too large: ${contentLength} bytes (max ${MAX_DOWNLOAD_SIZE})`,
+      });
+    }
+
+    const fileBuffer = Buffer.from(await response.arrayBuffer());
+    const cachePath = getCachePath(url, resolved.ext);
+    const hash = path.basename(cachePath, resolved.ext);
+    const cachedAt = new Date().toISOString();
+
+    try {
+      writeToLocalCache(cachePath, fileBuffer);
+      writeMetadata(cachePath, { sourceUrl: url });
+      logger.info(`Cached file: ${cachePath}`);
+    } catch (cacheErr) {
+      logger.warn(`Failed to cache file: ${cacheErr.message}`);
+    }
+
+    if (r2Cache.enabled) {
+      r2Cache
+        .put(getR2Key(cachePath), fileBuffer, {
+          "x-source-url": url,
+          "x-cached-at": cachedAt,
+          "x-mime": resolved.mime,
+        })
+        .catch(() => {});
+    }
+
+    return res.json(buildResponse(
+      hash, resolved.ext, resolved.mime, fileBuffer.length, cachedAt, "upstream"
+    ));
+  } catch (error) {
+    logger.error("Error in cache API:", error);
+    return res.status(error.status || 500).json({
+      error: error.status ? error.message : "Internal Server Error",
+    });
+  }
+};
+
 module.exports = handler;
 module.exports.serveDownload = serveDownload;
 module.exports.hashHandler = hashHandler;
+module.exports.cacheHandler = cacheHandler;
