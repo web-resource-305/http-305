@@ -42,9 +42,12 @@ module.exports = async (req, res, urlToProxy) => {
 
     if (!response.ok) {
       logger.error(`Failed to fetch URL: ${parsedUrl.href}, Status: ${response.status}`);
-      return res
-        .status(response.status)
-        .send(`Failed to fetch URL: ${response.statusText}`);
+      return res.status(response.status).render("upstream-error", {
+        statusCode: response.status,
+        statusText: response.statusText,
+        url: parsedUrl.href,
+        layout: false,
+      });
     }
 
     const contentType = response.headers.get("content-type");

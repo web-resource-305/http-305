@@ -40,14 +40,17 @@ module.exports = async (req, res, addressToProxy, jsDisabled) => {
     try {
       const response = await fetchUrl(urlToProxy.href);
 
-      // Handle non-OK responses
+      // Handle non-OK responses with a themed error page
       if (!response.ok) {
         logger.error(
           `Failed to fetch URL: ${urlToProxy.href}, Status: ${response.status}`,
         );
-        return res
-          .status(response.status)
-          .send(`Failed to fetch URL: ${response.statusText}`);
+        return res.status(response.status).render("upstream-error", {
+          statusCode: response.status,
+          statusText: response.statusText,
+          url: urlToProxy.href,
+          layout: false,
+        });
       }
       logger.debug(`Address after any redirects: ${response.url}`);
 
