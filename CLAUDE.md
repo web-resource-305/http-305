@@ -30,7 +30,6 @@ All proxying starts in `app.js` which defines routes and delegates to handlers:
 ```
 GET /pxy/html?url=<URL>&js=0|1&ukred=0|1  →  handlers/pxy-html.js
 GET /pxy/html/<URL>                        →  handlers/pxy-html.js
-GET /pxy/html/nojs/<URL>                   →  handlers/pxy-html.js
 GET /pxy/resource/<URL>                    →  handlers/pxy-resource.js
 GET /pxy/auto/<URL>                        →  handlers/pxy-auto.js
 GET /pxy/dl/<URL>                          →  handlers/pxy-dl.js

@@ -63,23 +63,6 @@ app.get("/pxy/html", async (req, res) => {
   }
 });
 
-// This has to come first
-app.get("/pxy/html/nojs/*", async (req, res) => {
-  try {
-    const url = req.params[0] ? req.params[0].trim() : "";
-    if (!url) {
-      return res.status(400).send("Please provide a URL");
-    }
-    return await pxyHTML(req, res, url, true);
-  } catch (err) {
-    logger.error(`Error: ${err.message}`);
-    if (!res.headersSent) {
-      res.status(err.status || 500)
-        .send(err.status ? err.message : "Internal Server Error");
-    }
-  }
-});
-// and this second
 app.get("/pxy/html/*", async (req, res) => {
   try {
     const url = req.params[0] ? req.params[0].trim() : "";

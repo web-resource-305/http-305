@@ -25,7 +25,6 @@ npm run lint       # ESLint
 |-------|---------|
 | `/pxy/html?url=<URL>&js=0\|1&ukred=0\|1` | Proxy HTML with URL rewriting (query params) |
 | `/pxy/html/<URL>` | Proxy HTML with URL rewriting (path) |
-| `/pxy/html/nojs/<URL>` | Proxy HTML with JS stripped |
 | `/pxy/resource/<URL>` | Stream static assets (CSS, JS, images, fonts) |
 | `/pxy/auto/<URL>` | Auto-detect content type and serve accordingly |
 | `/pxy/dl/<URL>` | Force download with tiered caching (rate-limited) |
