@@ -487,25 +487,44 @@ const cacheHandler = async (req, res) => {
     // Tier 3: Upstream fetch
     const response = await fetchUrl(parsedUrl.href);
     if (!response.ok) {
+      const contentType = response.headers.get("content-type");
       return res.status(response.status).json({
         error: `Upstream returned ${response.status}: ${response.statusText}`,
+        url,
+        upstreamStatus: response.status,
+        upstreamStatusText: response.statusText,
+        downloadable: null,
+        mime: contentType ? parseMime(contentType) : null,
+        size: null,
       });
     }
 
     const contentType = response.headers.get("content-type");
     const mime = parseMime(contentType) || hintMime;
+    const contentLength = Number(response.headers.get("content-length")) || null;
 
     const resolved = resolveDownloadMime(url, mime);
     if (!isDownloadable(resolved.mime)) {
       return res.status(415).json({
         error: `Unsupported file type: ${resolved.mime}`,
+        url,
+        upstreamStatus: response.status,
+        upstreamStatusText: response.statusText,
+        downloadable: false,
+        mime: resolved.mime,
+        size: contentLength,
       });
     }
 
-    const contentLength = Number(response.headers.get("content-length"));
     if (contentLength && contentLength > MAX_DOWNLOAD_SIZE) {
       return res.status(413).json({
         error: `File too large: ${contentLength} bytes (max ${MAX_DOWNLOAD_SIZE})`,
+        url,
+        upstreamStatus: response.status,
+        upstreamStatusText: response.statusText,
+        downloadable: true,
+        mime: resolved.mime,
+        size: contentLength,
       });
     }
 
