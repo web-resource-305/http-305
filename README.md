@@ -20,6 +20,9 @@ node setup.js     # Creates .env with defaults
 ```bash
 npm run dev        # Development (hot-reload via nodemon)
 npm start          # Production
+npm test           # Run Jest test suite
+npm run test:watch # Run tests in watch mode
+npm run test:coverage # Run tests with coverage report
 npm run lint       # ESLint
 ```
 
@@ -122,6 +125,35 @@ Upstream errors (403, 429, 404, 500, etc.) are rendered as themed error pages ma
 | `GITHUB_TOKEN` | — | GitHub PAT for curl-impersonate binary download (needed on shared IPs like Render) |
 | `SKIP_CURL_IMPERSONATE` | — | Set to `true` to skip curl-impersonate binary download |
 | `CURL_IMPERSONATE_VERSION` | — | Pin curl-impersonate to a specific version tag (e.g. `v1.5.2`) |
+
+## Testing
+
+The test suite uses [Jest](https://jestjs.io/) for unit tests and [supertest](https://github.com/ladjs/supertest) for HTTP integration tests.
+
+```
+tests/
+  setup.js                    — Test environment setup (silences logger)
+  app.test.js                 — Integration tests (supertest)
+  lib/
+    content-types.test.js     — MIME type / extension utilities
+    validate-url.test.js      — URL validation + SSRF protection
+    cidr.test.js              — IPv4 CIDR allowlist logic
+    html-rewriter.test.js     — JSDOM-based URL rewriting
+```
+
+### Unit Tests
+
+**content-types** — `parseMime()`, `isDownloadable()`, `isHTML()`, `getExtensionForMime()`, `getMimeForExtension()`, and the `DOWNLOAD_TYPES` registry.
+
+**validate-url** — SSRF-safe URL validation: accepted schemes, loopback/private IP rejection, internal TLD blocking, and malformed input handling.
+
+**cidr** — Pure function tests for `ipToInt()` and `parseCidr()`, plus module-level behavior tests that verify the CIDR allowlist with different `DL_ALLOWED_CIDRS` configurations (unset = allow all, set = enforce ranges/literals including IPv4-mapped IPv6).
+
+**html-rewriter** — URL rewriting for all element types: anchors, images, scripts, stylesheets, canonical links, forms, iframes, srcset, inline CSS `url()`, meta refresh, manifest removal, charset normalization, and full JS-disabled mode (script clearing, event handler stripping, `?js=0` propagation).
+
+### Integration Tests
+
+**app** — Smoke tests via supertest: static file serving, `/ping` health check, 404 handling, 400 responses for missing proxy URL parameters, and `X-Forwarded-For` trust proxy resolution through multiple hops.
 
 ## Architecture
 

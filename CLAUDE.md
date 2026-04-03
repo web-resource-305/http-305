@@ -16,10 +16,11 @@ node setup.js      # Create .env with default LOG_LEVEL=debug (run once)
 npm run dev        # Start with nodemon (hot-reload)
 npm start          # Production start
 npm run lint       # Run ESLint
+npm test           # Run Jest test suite
+npm run test:watch # Run tests in watch mode
+npm run test:coverage # Run tests with coverage report
 npm install        # Install/update dependencies + download curl-impersonate binaries
 ```
-
-No test suite is defined.
 
 ## Architecture
 
@@ -122,6 +123,85 @@ All cache writes across the project (upload, download, cache API) now include a 
 | `GITHUB_TOKEN` | (none) | GitHub PAT (no scopes needed) for curl-impersonate binary download — required on shared-IP hosts like Render where the unauthenticated GitHub API rate limit is quickly exhausted |
 | `SKIP_CURL_IMPERSONATE` | (none) | Set to `true` to skip curl-impersonate binary download entirely |
 | `CURL_IMPERSONATE_VERSION` | (none) | Pin curl-impersonate to a specific release tag (e.g. `v1.5.2`) instead of fetching latest |
+
+## Testing
+
+Jest test suite with supertest for integration tests. Tests live in `tests/` mirroring the source tree. Run `npm test` before committing.
+
+### Test Structure
+
+```
+tests/
+  setup.js                    — Sets LOG_LEVEL=error to silence Winston during tests
+  app.test.js                 — Integration tests (supertest)
+  lib/
+    content-types.test.js     — Unit tests for MIME/extension utilities
+    validate-url.test.js      — Unit tests for URL validation + SSRF protection
+    cidr.test.js              — Unit tests for CIDR allowlist logic
+    html-rewriter.test.js     — Unit tests for JSDOM-based URL rewriting
+```
+
+### What Each Test File Covers
+
+**`tests/lib/content-types.test.js`** — Tests all 6 exports from `lib/content-types.js`:
+- `DOWNLOAD_TYPES` registry shape and key entries
+- `parseMime()` — Content-Type header parsing, charset stripping, null/empty handling
+- `isDownloadable()` — download MIME detection with and without params
+- `isHTML()` — HTML MIME detection
+- `getExtensionForMime()` — MIME to extension mapping for download types
+- `getMimeForExtension()` — extension to MIME mapping (resource + download types), case insensitivity, fallback to octet-stream
+
+**`tests/lib/validate-url.test.js`** — Tests the SSRF-safe URL validator:
+- Valid URLs (http/https with paths, ports, query strings, fragments)
+- Rejected schemes (ftp, javascript, data, file)
+- Loopback protection (localhost, 127.0.0.1, [::1], 0.0.0.0)
+- Private range protection (10.x, 172.16.x, 192.168.x, 169.254.x AWS metadata)
+- Internal TLD protection (.local, .internal)
+- Malformed input (null, undefined, empty string, plain text)
+
+**`tests/lib/cidr.test.js`** — Tests `lib/cidr.js` pure functions and module-level behavior:
+- `ipToInt()` — IPv4 parsing, ::ffff: prefix stripping, invalid input rejection
+- `parseCidr()` — CIDR notation parsing, /0 to /32, bare IP as /32, host bit masking
+- Module with `DL_ALLOWED_CIDRS` unset — `enabled` is false, `isAllowed()` permits all
+- Module with `DL_ALLOWED_CIDRS` set — CIDR range matching, /32 exact match, IPv6 literal match, IPv4-mapped IPv6 handling, null/empty rejection
+- Uses `jest.resetModules()` to re-require the module with different env var states
+
+**`tests/lib/html-rewriter.test.js`** — Tests `lib/html-rewriter.js` URL rewriting:
+- `rewriteCSSUrls()` — relative/absolute `url()` rewriting, data: URL skipping, quote preservation
+- `rewriteHTML()` anchors — proxied through `/pxy/`, relative URL resolution, `?js=0` propagation, skip mailto/javascript/tel/fragment
+- `rewriteHTML()` images — proxied through `/pxy/resource/`, relative src resolution
+- `rewriteHTML()` scripts — proxied through `/pxy/resource/`, cleared when JS disabled
+- `rewriteHTML()` stylesheets — link[href] proxied through `/pxy/resource/`
+- `rewriteHTML()` canonical links — proxied through `/pxy/` (navigable, not resource)
+- `rewriteHTML()` forms — action resolved to absolute but not proxied
+- `rewriteHTML()` iframes — proxied through `/pxy/` (navigable)
+- `rewriteHTML()` srcset — all entries rewritten with descriptors preserved
+- `rewriteHTML()` inline styles — `url()` in `<style>` elements rewritten
+- `rewriteHTML()` meta refresh — redirect URL proxied
+- `rewriteHTML()` manifest removal — `<link rel="manifest">` stripped
+- `rewriteHTML()` charset — forced to utf-8
+- `rewriteHTML()` JS disabled mode — event handlers removed, inline script content cleared
+
+**`tests/app.test.js`** — Integration tests using supertest against the Express app:
+- `GET /` returns 200 and serves index.html
+- `GET /ping` returns 200
+- `GET /nonexistent` returns 404
+- `GET /pxy/html`, `/pxy/resource/`, `/pxy/dl/` without URL return 400
+- Trust proxy: `X-Forwarded-For` with multiple hops resolves to the real client IP
+
+### Configuration
+
+- `jest.config.js` — test matching, Node environment, setup file, coverage config
+- `tests/setup.js` — sets `LOG_LEVEL=error` before any module loads (silences Winston)
+- `eslint.config.js` — includes Jest globals (`describe`, `test`, `expect`, etc.) for test files
+- `app.js` — exports the Express app; `app.listen()` is guarded behind `require.main === module` so tests can import without starting the server
+
+### Writing New Tests
+
+- Pure-function libs (no I/O): test directly, no mocking needed
+- Modules reading env vars at require-time (e.g. `cidr.js`): use `jest.resetModules()` + fresh `require()` in `beforeEach`
+- Integration tests: use `supertest` with the exported `app`
+- Follow existing style: `describe` blocks per function/feature, `test` per case
 
 ## Code Style
 
