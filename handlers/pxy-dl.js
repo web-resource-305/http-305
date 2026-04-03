@@ -7,6 +7,7 @@ const path = require("path");
 const { DOWNLOAD_TYPES, parseMime, isDownloadable, getExtensionForMime, getMimeForExtension } = require("../lib/content-types");
 const r2Cache = require("../lib/r2-cache");
 const cidr = require("../lib/cidr");
+const fetchCurl = require("../lib/fetch-curl");
 
 const CACHE_DIR = path.join(__dirname, "..", ".cache");
 const MAX_DOWNLOAD_SIZE = Number(process.env.MAX_DOWNLOAD_SIZE) || 10 * 1024 * 1024;
@@ -413,11 +414,6 @@ const hashHandler = async (req, res, cacheKey) => {
  * cached and returns JSON metadata. CIDR-protected, no rate limit.
  */
 const cacheHandler = async (req, res) => {
-  if (!cidr.isAllowed(req.ip)) {
-    logger.warn(`CIDR deny: ${req.ip} on /api/cache`);
-    return res.status(403).json({ error: "Forbidden" });
-  }
-
   const url = req.query.url ? req.query.url.trim() : "";
   if (!url) {
     return res.status(400).json({ error: "url query parameter is required" });
@@ -436,7 +432,7 @@ const cacheHandler = async (req, res) => {
     const hintExt = getExtensionForMime(hintMime);
 
     // Helper to build the JSON response
-    const buildResponse = (hash, ext, mime, size, cachedAt, source) => ({
+    const buildResponse = (hash, ext, mime, size, cachedAt, source, fetchMethod = null, curlProfile = null) => ({
       url,
       hash,
       mime,
@@ -446,6 +442,7 @@ const cacheHandler = async (req, res) => {
       source,
       hashUrl: `/pxy/dl/hash/${hash}${ext}`,
       downloadUrl: `/pxy/dl/${encodeURIComponent(url)}`,
+      ...(fetchMethod && { fetchMethod, curlProfile }),
     });
 
     // Tier 1: Local cache
@@ -484,8 +481,30 @@ const cacheHandler = async (req, res) => {
       }
     }
 
-    // Tier 3: Upstream fetch
-    const response = await fetchUrl(parsedUrl.href);
+    // Tier 3: Upstream fetch — CIDR-gated to prevent cache-filling from unknown IPs
+    if (!cidr.isAllowed(req.ip)) {
+      logger.warn(`CIDR deny (cache miss): ${req.ip} on /api/cache`);
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    let response = await fetchUrl(parsedUrl.href);
+    let fetchMethod = "native";
+    let curlProfile = null;
+
+    // On 403, retry with curl-impersonate (different TLS fingerprint)
+    if (response.status === 403 && fetchCurl.enabled) {
+      logger.info(`Native fetch got 403, retrying with curl-impersonate: ${url}`);
+      try {
+        const curlResponse = await fetchCurl.fetchWithCurl(parsedUrl.href);
+        fetchMethod = "curl-impersonate";
+        curlProfile = curlResponse.profile;
+        response = curlResponse;
+        logger.info(`curl-impersonate [${curlProfile}] returned ${response.status}: ${url}`);
+      } catch (curlErr) {
+        logger.warn(`curl-impersonate fallback failed: ${curlErr.message}`);
+      }
+    }
+
     if (!response.ok) {
       const contentType = response.headers.get("content-type");
       return res.status(response.status).json({
@@ -496,6 +515,8 @@ const cacheHandler = async (req, res) => {
         downloadable: null,
         mime: contentType ? parseMime(contentType) : null,
         size: null,
+        fetchMethod,
+        curlProfile,
       });
     }
 
@@ -513,6 +534,8 @@ const cacheHandler = async (req, res) => {
         downloadable: false,
         mime: resolved.mime,
         size: contentLength,
+        fetchMethod,
+        curlProfile,
       });
     }
 
@@ -525,6 +548,8 @@ const cacheHandler = async (req, res) => {
         downloadable: true,
         mime: resolved.mime,
         size: contentLength,
+        fetchMethod,
+        curlProfile,
       });
     }
 
@@ -552,7 +577,7 @@ const cacheHandler = async (req, res) => {
     }
 
     return res.json(buildResponse(
-      hash, resolved.ext, resolved.mime, fileBuffer.length, cachedAt, "upstream"
+      hash, resolved.ext, resolved.mime, fileBuffer.length, cachedAt, "upstream", fetchMethod, curlProfile
     ));
   } catch (error) {
     logger.error("Error in cache API:", error);
