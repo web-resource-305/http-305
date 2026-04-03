@@ -274,7 +274,7 @@ const handler = async (req, res, urlToDownload) => {
 
     // Cache miss — upstream fetch + cache write requires CIDR authorization
     if (!cidr.isAllowed(req.ip)) {
-      logger.warn(`CIDR deny (cache miss): ${req.ip} for ${urlToDownload}`);
+      logger.warn(`CIDR deny (cache miss): ${req.ip} not in allowlist, for ${urlToDownload}`);
       return res.status(403).send("Forbidden");
     }
 
@@ -513,7 +513,7 @@ const cacheHandler = async (req, res) => {
 
     // Tier 3: Upstream fetch — CIDR-gated to prevent cache-filling from unknown IPs
     if (!cidr.isAllowed(req.ip)) {
-      logger.warn(`CIDR deny (cache miss): ${req.ip} on /api/cache`);
+      logger.warn(`CIDR deny (cache miss): ${req.ip} not in allowlist, on /api/cache`);
       return res.status(403).json({ error: "Forbidden" });
     }
 

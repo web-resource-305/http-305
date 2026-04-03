@@ -48,8 +48,15 @@ const upload = multer({
  * than the download endpoints (which allow all when unset).
  */
 const strictCidrGate = (req, res, next) => {
-  if (!cidr.enabled || !cidr.isAllowed(req.ip)) {
-    logger.warn(`Upload CIDR deny: ${req.ip}`);
+  if (!cidr.enabled) {
+    logger.warn(`Upload CIDR deny: no allowlist configured (DL_ALLOWED_CIDRS not set). Client IP: ${req.ip}`);
+    return res.status(403).render("upload-result", {
+      layout: false,
+      error: "Forbidden",
+    });
+  }
+  if (!cidr.isAllowed(req.ip)) {
+    logger.warn(`Upload CIDR deny: ${req.ip} not in allowlist`);
     return res.status(403).render("upload-result", {
       layout: false,
       error: "Forbidden",
