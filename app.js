@@ -12,7 +12,7 @@ logger.info(`Logging level: ${logger.level}`);
 const port = process.env.PORT || 8080;
 
 const app = express();
-app.set("trust proxy", 1);
+app.set("trust proxy", true);
 app.use("/pxy/dl", rateLimit({
   windowMs: 60_000,
   max: 60,
@@ -177,8 +177,11 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).send("Internal Server Error");
 });
 
-// Start the server
-const server = app.listen(port, () => logger.info(`http://localhost:${port}`));
+// Start the server (guarded so the app can be imported for testing)
+if (require.main === module) {
+  const server = app.listen(port, () => logger.info(`http://localhost:${port}`));
+  server.keepAliveTimeout = 120 * 1000;
+  server.headersTimeout = 120 * 1000;
+}
 
-server.keepAliveTimeout = 120 * 1000;
-server.headersTimeout = 120 * 1000;
+module.exports = app;

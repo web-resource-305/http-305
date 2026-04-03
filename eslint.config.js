@@ -25,5 +25,13 @@ module.exports = [
       "eqeqeq": ["error", "always"],
     },
   },
+  {
+    files: ["tests/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
+  },
   prettier,
 ];
