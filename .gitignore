@@ -132,3 +132,4 @@ dist
 
 # curl-impersonate binaries (downloaded at build time via postinstall)
 /bin/
+notes.txt

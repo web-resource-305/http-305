@@ -39,7 +39,7 @@ npm run lint       # ESLint
 ## Security
 
 - **SSRF protection** — URL validation rejects private/internal IPs, loopback addresses, non-HTTP schemes, and `.local`/`.internal` TLDs.
-- **CIDR allowlist** — Download cache writes and the `/api/cache` endpoint can be restricted to specific IPv4 ranges via `DL_ALLOWED_CIDRS`. Unset = allow all.
+- **CIDR allowlist** — Download cache writes and the `/api/cache` endpoint can be restricted to specific IPv4 ranges via `DL_ALLOWED_CIDRS`. Unset = allow all. Use `/32` for a single IP (e.g. `1.2.3.4/32`), or comma-separate multiple entries (`1.2.3.4/32,5.6.7.8/32`).
 - **Rate limiting** — `/pxy/dl` endpoints are rate-limited to 60 requests per minute per IP.
 - **MIME validation** — The download handler rejects non-document MIME types (415 response).
 

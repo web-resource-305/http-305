@@ -38,7 +38,7 @@ module.exports = async (req, res, addressToProxy, jsDisabled) => {
     logger.info(`Fetching URL: ${urlToProxy.href}`);
 
     try {
-      const response = await fetchUrl(urlToProxy.href);
+      const response = await fetchUrl(urlToProxy.href, fetchUrl.GOOGLEBOT_UA);
 
       // Handle non-OK responses with a themed error page
       if (!response.ok) {
