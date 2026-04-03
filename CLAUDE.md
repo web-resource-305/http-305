@@ -16,7 +16,7 @@ node setup.js      # Create .env with default LOG_LEVEL=debug (run once)
 npm run dev        # Start with nodemon (hot-reload)
 npm start          # Production start
 npm run lint       # Run ESLint
-npm install        # Install/update dependencies
+npm install        # Install/update dependencies + download curl-impersonate binaries
 ```
 
 No test suite is defined.
@@ -33,6 +33,8 @@ GET /pxy/html/<URL>                        →  handlers/pxy-html.js
 GET /pxy/resource/<URL>                    →  handlers/pxy-resource.js
 GET /pxy/auto/<URL>                        →  handlers/pxy-auto.js
 GET /pxy/dl/<URL>                          →  handlers/pxy-dl.js
+GET /pxy/dl/hash/<key>                     →  handlers/pxy-dl.js (hashHandler)
+GET /api/cache?url=<URL>                   →  handlers/pxy-dl.js (cacheHandler)
 GET /ping                                  →  inline (renders views/headers.hbs)
 GET /pxy                                   →  inline (returns 305 status info)
 ```
@@ -40,12 +42,15 @@ GET /pxy                                   →  inline (returns 305 status info)
 ### HTML Proxy Pipeline (`handlers/pxy-html.js`)
 
 The core of the project. For each proxied HTML request:
-1. Fetches the target URL using `node-fetch` with a Googlebot user-agent
+1. Fetches the target URL via `lib/fetch-url.js` (rotating user-agents)
 2. Delegates to `lib/html-rewriter.js` which parses HTML with JSDOM and rewrites all URLs in the DOM:
    - `<img src>`, `<link href>`, `<script src>` → `/pxy/resource/<encoded-url>`
-   - `<a href>` → `/pxy/auto/<encoded-url>` (server-side content-type detection)
+   - `<a href>`, `<iframe src>` → `/pxy/auto/<encoded-url>` (server-side content-type detection)
+   - `<link rel="canonical">` → `/pxy/auto/<encoded-url>` (preserves correct share URL on mobile)
    - `<form action>` → left as absolute URL (forms bypass the proxy)
 3. Returns the modified HTML
+
+Upstream errors (non-2xx) are rendered as a themed error page (`views/upstream-error.hbs`) that clearly indicates the error came from the upstream site, not the proxy.
 
 **Query params:**
 - `js=0` — strips all `<script>` tags; `<a>` links get `?js=0` appended for propagation
@@ -55,8 +60,10 @@ The core of the project. For each proxied HTML request:
 
 Fetches the upstream URL, inspects the `Content-Type` response header, and routes automatically:
 - `text/html` → rewrites URLs (same as pxy-html) and returns modified HTML
-- Downloadable types (PDF, DOCX, PPTX, XLSX, etc.) → serves as attachment download with caching
+- Downloadable types (PDF, DOCX, PPTX, XLSX, etc.) → redirects to `/pxy/dl/` for cached download
 - Everything else → streams directly with upstream Content-Type
+
+Upstream errors render the themed `upstream-error` view.
 
 ### Resource Proxy (`handlers/pxy-resource.js`)
 
@@ -72,11 +79,18 @@ Fetches downloadable files (PDF, DOCX, DOC, PPTX, PPT, XLSX, XLS) and serves the
 
 On R2 hit, the file is restored to local cache for future fast access.
 
+**Cloudflare / bot-protection fallback**: On a `403` from the upstream fetch, both `/pxy/dl/` and `/api/cache` retry once using `lib/fetch-curl.js` (curl-impersonate with a random Chrome/Firefox TLS fingerprint). If curl-impersonate is unavailable or also fails, the original 403 is returned cleanly. The `/api/cache` JSON response includes `fetchMethod` and `curlProfile` fields to indicate which method was used.
+
+**Cache API** (`/api/cache`): CIDR-gated endpoint that primes the cache and returns JSON metadata (hash, mime, size, URLs) rather than streaming the file. Intended for server-side pre-caching. Cached files can then be served via `/pxy/dl/hash/<sha256>` with no upstream fetch.
+
 ### Shared Libraries
 
 - `lib/content-types.js` — single source of truth for MIME type ↔ extension mappings (both resource and download types)
 - `lib/html-rewriter.js` — JSDOM-based URL rewriting, shared by `pxy-html` and `pxy-auto`
+- `lib/fetch-url.js` — upstream fetch wrapper with rotating browser user-agents and network error → HTTP status mapping
+- `lib/fetch-curl.js` — curl-impersonate fallback fetcher; uses binaries in `./bin/` downloaded at build time; exports `enabled` flag and `fetchWithCurl(url)`
 - `lib/r2-cache.js` — optional R2 backup cache layer, active only when `R2_ACCESS_KEY_ID` is set
+- `lib/cidr.js` — IPv4 CIDR allowlist checker for download endpoints
 
 ## Environment Variables
 
@@ -90,7 +104,10 @@ On R2 hit, the file is restored to local cache for future fast access.
 | `R2_ACCESS_KEY_ID` | (none) | R2 access key (enables R2 cache when set) |
 | `R2_SECRET_ACCESS_KEY` | (none) | R2 secret key |
 | `R2_BUCKET_NAME` | (none) | R2 bucket name for cached files |
-| `DL_ALLOWED_CIDRS` | (none) | Comma-separated IPv4 CIDRs allowed to use `/pxy/dl/` and auto-download (unset = allow all) |
+| `DL_ALLOWED_CIDRS` | (none) | Comma-separated IPv4 CIDRs allowed to write to the download cache (unset = allow all) |
+| `GITHUB_TOKEN` | (none) | GitHub PAT (no scopes needed) for curl-impersonate binary download — required on shared-IP hosts like Render where the unauthenticated GitHub API rate limit is quickly exhausted |
+| `SKIP_CURL_IMPERSONATE` | (none) | Set to `true` to skip curl-impersonate binary download entirely |
+| `CURL_IMPERSONATE_VERSION` | (none) | Pin curl-impersonate to a specific release tag (e.g. `v1.5.2`) instead of fetching latest |
 
 ## Code Style
 

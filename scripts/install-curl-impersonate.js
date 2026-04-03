@@ -22,7 +22,7 @@ const { execSync } = require("child_process");
 
 const REPO = "lexiforest/curl-impersonate";
 const BIN_DIR = path.join(__dirname, "..", "bin");
-const WANTED_BINS = ["curl_chrome124", "curl_chrome120", "curl_ff120", "curl_ff135"];
+const WANTED_BINS = ["curl_chrome124", "curl_chrome120", "curl_firefox135", "curl_firefox133"];
 
 const skip = (reason) => {
   console.log(`curl-impersonate install: skipping — ${reason}`);

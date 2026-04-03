@@ -275,7 +275,24 @@ const handler = async (req, res, urlToDownload) => {
       return res.status(403).send("Forbidden");
     }
 
-    const response = await fetchUrl(parsedUrl.href);
+    let response = await fetchUrl(parsedUrl.href);
+
+    // On 403, retry with curl-impersonate (different TLS fingerprint)
+    // If curl itself errors or also returns non-OK, fall through to original response
+    if (response.status === 403 && fetchCurl.enabled) {
+      logger.info(`Native fetch got 403, retrying with curl-impersonate: ${urlToDownload}`);
+      try {
+        const curlResponse = await fetchCurl.fetchWithCurl(parsedUrl.href);
+        if (curlResponse.ok) {
+          logger.info(`curl-impersonate [${curlResponse.profile}] succeeded: ${urlToDownload}`);
+          response = curlResponse;
+        } else {
+          logger.warn(`curl-impersonate [${curlResponse.profile}] returned ${curlResponse.status} — falling back to original 403`);
+        }
+      } catch (curlErr) {
+        logger.warn(`curl-impersonate fallback failed: ${curlErr.message} — falling back to original 403`);
+      }
+    }
 
     if (!response.ok) {
       logger.error(`Failed to fetch URL: ${urlToDownload}, Status: ${response.status}`);
