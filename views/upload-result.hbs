@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{#if error}}Upload Error{{else}}Upload Complete{{/if}} — HTTP 305</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#153a59">
+    <link rel="stylesheet" href="/css/theme.css">
+    <style>
+        .result-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .tagline {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 16px;
+            text-align: center;
+        }
+
+        .message {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin: 0 0 20px;
+            text-align: center;
+        }
+
+        .details {
+            margin-bottom: 24px;
+        }
+
+        .copyable {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .copy-btn {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px;
+            border-radius: 4px;
+            transition: color 0.2s;
+            line-height: 0;
+        }
+
+        .copy-btn:hover {
+            color: var(--accent);
+        }
+
+        .copy-btn.copied {
+            color: var(--success);
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .actions .btn {
+            flex: 1;
+            text-align: center;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-outline:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        @media (max-width: 480px) {
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card" style="text-align: center;">
+        <div class="logo">
+            <h1>HTTP <span>305</span></h1>
+        </div>
+
+        {{#if error}}
+        <span class="badge badge-error">Upload Failed</span>
+        <p class="tagline">{{error}}</p>
+        {{#if errorDetail}}
+        <p class="message">{{errorDetail}}</p>
+        {{/if}}
+
+        <div class="actions">
+            <a href="/upload" class="btn">Try Again</a>
+            <a href="/" class="btn btn-outline">Home</a>
+        </div>
+        {{else}}
+        <span class="badge badge-success">Cached</span>
+        <p class="tagline">{{filename}}</p>
+        <p class="message">
+            File uploaded and cached successfully.
+        </p>
+
+        <div class="details">
+            <div class="detail-box">
+                <span class="label">Hash (URL)</span>
+                <span class="value">{{hash}}</span>
+            </div>
+
+            <div class="detail-box">
+                <span class="label">File Hash (SHA-256)</span>
+                <span class="value">{{fileHash}}</span>
+            </div>
+
+            <div class="detail-box">
+                <span class="label">Permalink</span>
+                <span class="copyable">
+                    <a href="{{hashUrl}}" id="permalink">{{hashUrl}}</a>
+                    <button type="button" class="copy-btn" onclick="copyPermalink()" title="Copy permalink">
+                        <svg class="icon-copy" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/>
+                            <path d="M10.5 5.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h2.5"/>
+                        </svg>
+                        <svg class="icon-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                            <path d="M3 8.5l3.5 3.5 6.5-7"/>
+                        </svg>
+                    </button>
+                </span>
+            </div>
+
+            {{#if sourceUrl}}
+            <div class="detail-box">
+                <span class="label">Source URL</span>
+                <a href="{{downloadUrl}}">{{sourceUrl}}</a>
+            </div>
+            {{/if}}
+
+            <div class="detail-box">
+                <span class="label">Details</span>
+                <span class="value">{{mime}} &bull; {{sizeFormatted}} &bull; {{ext}}</span>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a href="{{hashUrl}}" class="btn">Download</a>
+            <a href="/upload" class="btn btn-outline">Upload Another</a>
+        </div>
+        {{/if}}
+
+        <div class="footer">
+            <p>HTTP <a href="/">305</a>: Use Proxy</p>
+        </div>
+    </div>
+
+    <script>
+        function copyPermalink() {
+            var link = document.getElementById("permalink");
+            var url = location.origin + link.getAttribute("href");
+            var btn = document.querySelector(".copy-btn");
+            var iconCopy = btn.querySelector(".icon-copy");
+            var iconCheck = btn.querySelector(".icon-check");
+
+            navigator.clipboard.writeText(url).then(function () {
+                btn.classList.add("copied");
+                iconCopy.style.display = "none";
+                iconCheck.style.display = "";
+                setTimeout(function () {
+                    btn.classList.remove("copied");
+                    iconCopy.style.display = "";
+                    iconCheck.style.display = "none";
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+
+</html>

@@ -125,8 +125,9 @@ const serveDownload = async (res, url, response, detectedMime, canWrite = true) 
 
         // Restore to local cache
         try {
+          const fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
           writeToLocalCache(cachePath, fileBuffer);
-          writeMetadata(cachePath, { sourceUrl: url });
+          writeMetadata(cachePath, { sourceUrl: url, fileHash });
           logger.info(`Restored from R2 to local cache: ${cachePath}`);
         } catch (restoreErr) {
           logger.warn(`Failed to restore to local cache: ${restoreErr.message}`);
@@ -152,9 +153,10 @@ const serveDownload = async (res, url, response, detectedMime, canWrite = true) 
     res.setHeader("X-Cached-At", cachedAt);
 
     if (canWrite) {
+      const fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
       try {
         writeToLocalCache(cachePath, fileBuffer);
-        writeMetadata(cachePath, { sourceUrl: url });
+        writeMetadata(cachePath, { sourceUrl: url, fileHash });
         logger.info(`Cached file: ${cachePath}`);
       } catch (cacheErr) {
         logger.warn(`Failed to cache file: ${cacheErr.message}`);
@@ -252,8 +254,9 @@ const handler = async (req, res, urlToDownload) => {
         const r2Result = await r2Cache.get(getR2Key(cachePath));
         if (r2Result) {
           try {
+            const fileHash = crypto.createHash("sha256").update(r2Result.buffer).digest("hex");
             writeToLocalCache(cachePath, r2Result.buffer);
-            writeMetadata(cachePath, { sourceUrl: urlToDownload });
+            writeMetadata(cachePath, { sourceUrl: urlToDownload, fileHash });
             logger.info(`R2 early restore: ${cachePath}`);
           } catch (restoreErr) {
             logger.warn(`R2 early restore failed: ${restoreErr.message}`);
@@ -350,7 +353,10 @@ const hashHandler = async (req, res, cacheKey) => {
   const filename = `${hash}${ext}`;
   const cachePath = path.join(CACHE_DIR, filename);
   const mime = ext ? getMimeForExtension(ext) : "application/octet-stream";
-  const etag = `"${hash}"`;
+
+  // ETag includes mtime so overwrites (e.g. manual upload) bust the browser cache
+  const stat = fs.existsSync(cachePath) ? fs.statSync(cachePath) : null;
+  const etag = stat ? `"${hash}-${stat.mtimeMs}"` : `"${hash}"`;
 
   res.setHeader("ETag", etag);
   if (req.headers["if-none-match"] === etag) {
@@ -358,11 +364,12 @@ const hashHandler = async (req, res, cacheKey) => {
   }
 
   // Tier 1: Local cache
-  if (fs.existsSync(cachePath)) {
+  if (stat) {
     logger.info(`Hash lookup local hit: ${filename}`);
-    const stat = fs.statSync(cachePath);
     const meta = readMetadata(cachePath);
-    const displayName = deriveDisplayName(meta && meta.sourceUrl, ext) || filename;
+    logger.debug(`Hash lookup meta for ${filename}: ${JSON.stringify(meta)}`);
+    const displayName = (meta && meta.originalName) || deriveDisplayName(meta && meta.sourceUrl, ext) || filename;
+    logger.debug(`Hash lookup displayName resolved: "${displayName}" (originalName=${meta && meta.originalName}, sourceUrl=${meta && meta.sourceUrl})`);
     res.setHeader("Content-Type", mime);
     res.setHeader("Content-Disposition", `attachment; filename="${displayName}"`);
     res.setHeader("Content-Length", stat.size);
@@ -394,17 +401,22 @@ const hashHandler = async (req, res, cacheKey) => {
 
           // Restore to local cache
           try {
+            const fileHash = crypto.createHash("sha256").update(r2Result.buffer).digest("hex");
             writeToLocalCache(resolvedPath, r2Result.buffer);
             const r2SourceUrl = r2Result.metadata["x-source-url"];
-            if (r2SourceUrl) {
-              writeMetadata(resolvedPath, { sourceUrl: r2SourceUrl });
-            }
+            const r2OriginalName = r2Result.metadata["x-original-name"];
+            writeMetadata(resolvedPath, {
+              sourceUrl: r2SourceUrl || null,
+              fileHash,
+              ...(r2OriginalName && { originalName: r2OriginalName }),
+            });
           } catch (restoreErr) {
             logger.warn(`R2 restore failed: ${restoreErr.message}`);
           }
 
           const r2SourceUrl = r2Result.metadata["x-source-url"];
-          const displayName = deriveDisplayName(r2SourceUrl, resolvedExt) || r2Key;
+          const r2OriginalName = r2Result.metadata["x-original-name"];
+          const displayName = r2OriginalName || deriveDisplayName(r2SourceUrl, resolvedExt) || r2Key;
           const r2Mime = r2Result.metadata["x-mime"]
             || (resolvedExt ? getMimeForExtension(resolvedExt) : "application/octet-stream");
           res.setHeader("Content-Type", r2Mime);
@@ -481,8 +493,9 @@ const cacheHandler = async (req, res) => {
           if (r2Result) {
             const hash = path.basename(cachePath, hintExt);
             try {
+              const fileHash = crypto.createHash("sha256").update(r2Result.buffer).digest("hex");
               writeToLocalCache(cachePath, r2Result.buffer);
-              writeMetadata(cachePath, { sourceUrl: url });
+              writeMetadata(cachePath, { sourceUrl: url, fileHash });
             } catch (restoreErr) {
               logger.warn(`R2 restore failed: ${restoreErr.message}`);
             }
@@ -573,11 +586,12 @@ const cacheHandler = async (req, res) => {
     const fileBuffer = Buffer.from(await response.arrayBuffer());
     const cachePath = getCachePath(url, resolved.ext);
     const hash = path.basename(cachePath, resolved.ext);
+    const fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
     const cachedAt = new Date().toISOString();
 
     try {
       writeToLocalCache(cachePath, fileBuffer);
-      writeMetadata(cachePath, { sourceUrl: url });
+      writeMetadata(cachePath, { sourceUrl: url, fileHash });
       logger.info(`Cached file: ${cachePath}`);
     } catch (cacheErr) {
       logger.warn(`Failed to cache file: ${cacheErr.message}`);

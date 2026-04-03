@@ -34,14 +34,17 @@ npm run lint       # ESLint
 | `/pxy/dl/<URL>` | Force download with tiered caching (rate-limited) |
 | `/pxy/dl/hash/<key>` | Download a cached file by its SHA-256 hash key |
 | `/api/cache?url=<URL>` | Cache API — ensure a file is cached and return JSON metadata |
+| `GET /upload` | Upload form — manual file upload to cache (strict CIDR) |
+| `POST /upload` | Upload handler — process file upload (strict CIDR) |
 | `/ping` | Health check — renders request headers |
 
 ## Security
 
 - **SSRF protection** — URL validation rejects private/internal IPs, loopback addresses, non-HTTP schemes, and `.local`/`.internal` TLDs.
 - **CIDR allowlist** — Download cache writes and the `/api/cache` endpoint can be restricted to specific IPv4 ranges via `DL_ALLOWED_CIDRS`. Unset = allow all. Use `/32` for a single IP (e.g. `1.2.3.4/32`), or comma-separate multiple entries (`1.2.3.4/32,5.6.7.8/32`).
+- **Strict CIDR (upload)** — The `/upload` endpoint uses strict CIDR gating: it is **blocked entirely** when `DL_ALLOWED_CIDRS` is not set. A valid allowlist is required to access the upload form and submit files.
 - **Rate limiting** — `/pxy/dl` endpoints are rate-limited to 60 requests per minute per IP.
-- **MIME validation** — The download handler rejects non-document MIME types (415 response).
+- **MIME validation** — The download and upload handlers reject non-document MIME types (415 response).
 
 ## Caching
 
@@ -51,9 +54,19 @@ Downloads use a tiered cache strategy:
 2. **R2** — Cloudflare R2 bucket (optional, requires R2 env vars). Persistent across deploys. On R2 hit, the file is restored to local cache.
 3. **Upstream** — Fresh fetch from the original URL. Saves to both tiers.
 
-Cached files include `.meta` sidecar files to preserve the original source URL for human-readable download filenames. ETag headers enable `304 Not Modified` responses for repeat requests.
+Cached files include `.meta` sidecar files storing the original source URL (for human-readable download filenames) and a `fileHash` (SHA-256 of file contents). ETag headers enable `304 Not Modified` responses for repeat requests.
 
 Cached files via `/api/cache` can be served by hash key (`/pxy/dl/hash/<sha256>`), which is stable and linkable regardless of the original URL.
+
+## Upload
+
+The `/upload` endpoint provides a browser-based form for manually uploading document files to the proxy cache. It requires strict CIDR authorization (`DL_ALLOWED_CIDRS` must be configured and the client IP must be in the allowlist).
+
+- **Allowed types**: Same whitelist as downloads (PDF, DOCX, DOC, PPTX, PPT, XLSX, XLS, RTF, ODT, ODP, ODS, EPUB)
+- **Size limit**: Same `MAX_DOWNLOAD_SIZE` as downloads (default 10 MB)
+- **Optional URL**: If a canonical URL is provided, the cache key is `SHA-256(normalized URL)` — identical to how `/api/cache` and `/pxy/dl` work, so the file is immediately servable from those routes. If omitted, the cache key is `SHA-256(file contents)`.
+- **Always overwrites**: Manual upload always replaces existing cache entries for the same hash key.
+- **R2 backup**: Uploaded files are backed up to R2 (if configured), same as fetched downloads.
 
 ## Upstream Fetch
 

@@ -35,6 +35,8 @@ GET /pxy/auto/<URL>                        →  handlers/pxy-auto.js
 GET /pxy/dl/<URL>                          →  handlers/pxy-dl.js
 GET /pxy/dl/hash/<key>                     →  handlers/pxy-dl.js (hashHandler)
 GET /api/cache?url=<URL>                   →  handlers/pxy-dl.js (cacheHandler)
+GET /upload                                →  handlers/upload.js (formHandler)
+POST /upload                               →  handlers/upload.js (uploadHandler)
 GET /ping                                  →  inline (renders views/headers.hbs)
 GET /pxy                                   →  inline (returns 305 status info)
 ```
@@ -82,6 +84,18 @@ On R2 hit, the file is restored to local cache for future fast access.
 **Cloudflare / bot-protection fallback**: On a `403` from the upstream fetch, both `/pxy/dl/` and `/api/cache` retry once using `lib/fetch-curl.js` (curl-impersonate with a random Chrome/Firefox TLS fingerprint). If curl-impersonate is unavailable or also fails, the original 403 is returned cleanly. The `/api/cache` JSON response includes `fetchMethod` and `curlProfile` fields to indicate which method was used.
 
 **Cache API** (`/api/cache`): CIDR-gated endpoint that primes the cache and returns JSON metadata (hash, mime, size, URLs) rather than streaming the file. Intended for server-side pre-caching. Cached files can then be served via `/pxy/dl/hash/<sha256>` with no upstream fetch.
+
+### Upload (`handlers/upload.js`)
+
+Manual file upload to the proxy cache via a browser form. Uses **strict CIDR gating** — the endpoint is blocked entirely when `DL_ALLOWED_CIDRS` is not configured (unlike download endpoints which allow all when unset). Requires `multer` for multipart form parsing.
+
+- Accepts files restricted to the `DOWNLOAD_TYPES` whitelist and `MAX_DOWNLOAD_SIZE` limit
+- Optional canonical URL field: if provided, the cache key is `SHA256(normalized URL)` (same as `getCachePath` in pxy-dl), making the file immediately servable via `/pxy/dl/<URL>`. If omitted, the cache key is `SHA256(file contents)`.
+- Always overwrites existing cache entries (manual upload = intentional replacement)
+- Writes to local cache + R2, stores `fileHash` (content SHA256) in `.meta` sidecar
+- Returns a styled HTML result page with hash, permalink, and file details
+
+All cache writes across the project (upload, download, cache API) now include a `fileHash` field in `.meta` sidecar files — the SHA256 of the file content, distinct from the URL-based cache key.
 
 ### Shared Libraries
 

@@ -6,6 +6,7 @@ const pxyResource = require("./handlers/pxy-resource.js");
 const pxyDl = require("./handlers/pxy-dl.js");
 const pxyAuto = require("./handlers/pxy-auto.js");
 const pxyHTML = require("./handlers/pxy-html.js");
+const { upload, strictCidrGate, formHandler, uploadHandler } = require("./handlers/upload.js");
 
 logger.info(`Logging level: ${logger.level}`);
 const port = process.env.PORT || 8080;
@@ -101,6 +102,7 @@ app.get("/pxy/resource/*", async (req, res) => {
 app.get("/pxy/dl/hash/*", async (req, res) => {
   try {
     const key = req.params[0] ? req.params[0].trim() : "";
+    logger.debug(`Hash download route hit, key: ${key}`);
     if (!key) {
       return res.status(400).send("Please provide a cache key");
     }
@@ -152,6 +154,10 @@ app.get("/pxy/*", async (req, res) => {
 
 // Cache API — ensure a downloadable is cached and return JSON metadata (CIDR-protected)
 app.get("/api/cache", pxyDl.cacheHandler);
+
+// Upload — manual file upload to cache (strict CIDR: blocked when allowlist is unset)
+app.get("/upload", strictCidrGate, formHandler);
+app.post("/upload", strictCidrGate, upload.single("file"), uploadHandler);
 
 // Useful for keepalive
 app.get("/ping", (req, res) => {
