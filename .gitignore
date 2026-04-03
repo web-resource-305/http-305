@@ -129,6 +129,3 @@ dist
 .yarn/install-state.gz
 .pnp.*
 /.claude
-
-# curl-impersonate binaries (downloaded at build time via postinstall)
-/bin/
