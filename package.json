@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "build": "npm install",
+    "postinstall": "node scripts/install-curl-impersonate.js",
     "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -19,7 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1021.0",
-    "cuimp": "^1.10.0",
+    "cuimp": "^1.7.0",
     "dotenv": "^17.3.1",
     "express": "^4.19.2",
     "express-handlebars": "^8.0.1",
