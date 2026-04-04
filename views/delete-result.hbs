@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{#if error}}Delete Error{{else}}Deleted{{/if}} — HTTP 305</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#153a59">
+    <link rel="stylesheet" href="/css/theme.css">
+    <style>
+        .tagline {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 16px;
+            text-align: center;
+        }
+
+        .message {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin: 0 0 20px;
+            text-align: center;
+        }
+
+        .details {
+            margin-bottom: 24px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .actions .btn {
+            flex: 1;
+            text-align: center;
+            padding: 12px 16px;
+            font-size: 14px;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-outline:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        @media (max-width: 480px) {
+            .actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card" style="text-align: center;">
+        <div class="logo">
+            <h1>HTTP <span>305</span></h1>
+        </div>
+
+        {{#if error}}
+        <span class="badge badge-error">Delete Failed</span>
+        <p class="tagline">{{error}}</p>
+        {{#if errorDetail}}
+        <p class="message">{{errorDetail}}</p>
+        {{/if}}
+
+        <div class="actions">
+            <a href="/delete" class="btn">Try Again</a>
+            <a href="/" class="btn btn-outline">Home</a>
+        </div>
+        {{else}}
+        <span class="badge badge-success">Deleted</span>
+        <p class="tagline">Cache entry removed</p>
+
+        <div class="details">
+            <div class="detail-box">
+                <span class="label">Hash</span>
+                <span class="value">{{hash}}</span>
+            </div>
+
+            {{#if sourceUrl}}
+            <div class="detail-box">
+                <span class="label">Source URL</span>
+                <span class="value">{{sourceUrl}}</span>
+            </div>
+            {{/if}}
+
+            {{#if originalName}}
+            <div class="detail-box">
+                <span class="label">Original Filename</span>
+                <span class="value">{{originalName}}</span>
+            </div>
+            {{/if}}
+
+            <div class="detail-box">
+                <span class="label">Deleted From</span>
+                <span class="value">
+                    {{#if localCount}}Local ({{localCount}} file{{#if r2Count}} &bull; {{/if}}){{/if}}{{#if r2Count}}R2 ({{r2Count}} object){{/if}}
+                </span>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a href="/delete" class="btn">Delete Another</a>
+            <a href="/upload" class="btn btn-outline">Upload</a>
+        </div>
+        {{/if}}
+
+        <div class="footer">
+            <p>HTTP <a href="/">305</a>: Use Proxy</p>
+        </div>
+    </div>
+</body>
+
+</html>

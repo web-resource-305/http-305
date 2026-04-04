@@ -7,6 +7,7 @@ const pxyDl = require("./handlers/pxy-dl.js");
 const pxyAuto = require("./handlers/pxy-auto.js");
 const pxyHTML = require("./handlers/pxy-html.js");
 const { upload, strictCidrGate, formHandler, uploadHandler } = require("./handlers/upload.js");
+const { strictCidrGate: deleteCidrGate, formHandler: deleteFormHandler, deleteHandler } = require("./handlers/delete.js");
 
 logger.info(`Logging level: ${logger.level}`);
 const port = process.env.PORT || 8080;
@@ -158,6 +159,10 @@ app.get("/api/cache", pxyDl.cacheHandler);
 // Upload — manual file upload to cache (strict CIDR: blocked when allowlist is unset)
 app.get("/upload", strictCidrGate, formHandler);
 app.post("/upload", strictCidrGate, upload.single("file"), uploadHandler);
+
+// Delete — remove cached file (strict CIDR: blocked when allowlist is unset)
+app.get("/delete", deleteCidrGate, deleteFormHandler);
+app.post("/delete", deleteCidrGate, express.urlencoded({ extended: false }), deleteHandler);
 
 // Useful for keepalive
 app.get("/ping", (req, res) => {

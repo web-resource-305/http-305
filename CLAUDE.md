@@ -38,6 +38,8 @@ GET /pxy/dl/hash/<key>                     →  handlers/pxy-dl.js (hashHandler)
 GET /api/cache?url=<URL>                   →  handlers/pxy-dl.js (cacheHandler)
 GET /upload                                →  handlers/upload.js (formHandler)
 POST /upload                               →  handlers/upload.js (uploadHandler)
+GET /delete                                →  handlers/delete.js (formHandler)
+POST /delete                               →  handlers/delete.js (deleteHandler)
 GET /ping                                  →  inline (renders views/headers.hbs)
 GET /pxy                                   →  inline (returns 305 status info)
 ```
@@ -98,13 +100,24 @@ Manual file upload to the proxy cache via a browser form. Uses **strict CIDR gat
 
 All cache writes across the project (upload, download, cache API) now include a `fileHash` field in `.meta` sidecar files — the SHA256 of the file content, distinct from the URL-based cache key.
 
+### Delete (`handlers/delete.js`)
+
+Manual cache entry deletion via a browser form. Uses **strict CIDR gating** — same as upload, blocked when `DL_ALLOWED_CIDRS` is not configured.
+
+- Accepts a SHA256 hash directly, or a URL to hash (same normalization as `getCachePath`)
+- If hash is provided, it takes priority over URL
+- Scans local `.cache/` directory for matching files (glob by hash prefix)
+- Deletes matching files + `.meta` sidecars from local cache
+- Deletes matching objects from R2 (discovers keys via local filenames or R2 prefix listing)
+- Returns a styled result page showing what was deleted and metadata from the `.meta` sidecar
+
 ### Shared Libraries
 
 - `lib/content-types.js` — single source of truth for MIME type ↔ extension mappings (both resource and download types)
 - `lib/html-rewriter.js` — JSDOM-based URL rewriting, shared by `pxy-html` and `pxy-auto`
 - `lib/fetch-url.js` — upstream fetch wrapper with rotating browser user-agents and network error → HTTP status mapping
 - `lib/fetch-curl.js` — curl-impersonate fallback fetcher; uses binaries in `./bin/` downloaded at build time; exports `enabled` flag and `fetchWithCurl(url)`
-- `lib/r2-cache.js` — optional R2 backup cache layer, active only when `R2_ACCESS_KEY_ID` is set
+- `lib/r2-cache.js` — optional R2 backup cache layer, active only when `R2_ACCESS_KEY_ID` is set; exports `put`, `get`, `del`, `list`
 - `lib/cidr.js` — IPv4 CIDR allowlist checker for download endpoints
 
 ## Environment Variables

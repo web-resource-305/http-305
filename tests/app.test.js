@@ -34,6 +34,38 @@ describe("app routes", () => {
   });
 });
 
+describe("delete routes", () => {
+  test("GET /delete renders form", async () => {
+    const res = await request(app).get("/delete");
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("Delete from cache");
+  });
+
+  test("POST /delete without hash or URL returns 400", async () => {
+    const res = await request(app)
+      .post("/delete")
+      .send("");
+    expect(res.status).toBe(400);
+    expect(res.text).toContain("Nothing to delete");
+  });
+
+  test("POST /delete with invalid hash returns 400", async () => {
+    const res = await request(app)
+      .post("/delete")
+      .send("hash=not-a-valid-hash");
+    expect(res.status).toBe(400);
+    expect(res.text).toContain("Invalid hash");
+  });
+
+  test("POST /delete with non-existent hash returns 404", async () => {
+    const res = await request(app)
+      .post("/delete")
+      .send("hash=0000000000000000000000000000000000000000000000000000000000000000");
+    expect(res.status).toBe(404);
+    expect(res.text).toContain("Not found");
+  });
+});
+
 describe("trust proxy", () => {
   test("req.ip reflects X-Forwarded-For through multiple hops", async () => {
     // Render routes through internal proxies, so X-Forwarded-For may have

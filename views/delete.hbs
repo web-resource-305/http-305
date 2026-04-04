@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete — HTTP 305</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#153a59">
+    <link rel="stylesheet" href="/css/theme.css">
+    <style>
+        .separator {
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin: 4px 0 20px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: -12px 0 20px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <div class="logo">
+            <h1>HTTP <span>305</span></h1>
+            <p>Delete from cache</p>
+        </div>
+
+        <form action="/delete" method="POST">
+            <div class="input-group">
+                <label for="hash">Cache Hash</label>
+                <input type="text" name="hash" id="hash"
+                    placeholder="e.g. 382ac9ea60bb0ba40c9eb0815f4ec7f6..."
+                    pattern="[a-fA-F0-9]{64}"
+                    maxlength="64"
+                    spellcheck="false"
+                    autocomplete="off">
+            </div>
+
+            <p class="separator">— or —</p>
+
+            <div class="input-group">
+                <label for="url">Original URL</label>
+                <input type="url" name="url" id="url"
+                    placeholder="https://example.com/report.pdf">
+            </div>
+            <p class="help-text">If both are provided, the hash takes priority.</p>
+
+            <button type="submit" class="btn btn-block">Delete from Cache</button>
+        </form>
+
+        <div class="footer">
+            <p>Permanently removes from local cache and R2 backup</p>
+        </div>
+    </div>
+</body>
+
+</html>
