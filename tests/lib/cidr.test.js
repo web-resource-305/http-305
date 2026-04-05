@@ -162,3 +162,22 @@ describe("module behavior — CIDRS set", () => {
     expect(cidr.isAllowed("::ffff:192.168.1.50")).toBe(true);
   });
 });
+
+describe("clientIp", () => {
+  const { clientIp } = require("../../lib/cidr");
+
+  test("prefers CF-Connecting-IP over req.ip", () => {
+    const req = { ip: "10.0.0.1", headers: { "cf-connecting-ip": "86.150.91.139" } };
+    expect(clientIp(req)).toBe("86.150.91.139");
+  });
+
+  test("falls back to req.ip when CF-Connecting-IP is absent", () => {
+    const req = { ip: "203.0.113.50", headers: {} };
+    expect(clientIp(req)).toBe("203.0.113.50");
+  });
+
+  test("falls back to req.ip when headers is undefined", () => {
+    const req = { ip: "203.0.113.50" };
+    expect(clientIp(req)).toBe("203.0.113.50");
+  });
+});

@@ -14,6 +14,7 @@ jest.mock("fs", () => ({
 jest.mock("../../lib/cidr", () => ({
   enabled: false,
   isAllowed: jest.fn(),
+  clientIp: jest.fn((req) => req.headers?.["cf-connecting-ip"] || req.ip),
 }));
 
 jest.mock("../../lib/fetch-curl", () => ({
@@ -35,7 +36,10 @@ const cidr = require("../../lib/cidr");
 const r2Cache = require("../../lib/r2-cache");
 const { reportHandler } = require("../../handlers/pxy-dl");
 
-const mockReq = (ip = "127.0.0.1") => ({ ip });
+const mockReq = (ip = "127.0.0.1", cfIp = null) => ({
+  ip,
+  headers: cfIp ? { "cf-connecting-ip": cfIp } : {},
+});
 const mockRes = () => {
   const res = {};
   res.status = jest.fn().mockReturnValue(res);

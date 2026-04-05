@@ -25,14 +25,14 @@ const readMetadata = (cachePath) => {
  */
 const strictCidrGate = (req, res, next) => {
   if (!cidr.enabled) {
-    logger.warn(`Delete CIDR deny: no allowlist configured (DL_ALLOWED_CIDRS not set). Client IP: ${req.ip}`);
+    logger.warn(`Delete CIDR deny: no allowlist configured (DL_ALLOWED_CIDRS not set). Client IP: ${cidr.clientIp(req)}`);
     return res.status(403).render("delete-result", {
       layout: false,
       error: "Forbidden",
     });
   }
-  if (!cidr.isAllowed(req.ip)) {
-    logger.warn(`Delete CIDR deny: ${req.ip} not in allowlist`);
+  if (!cidr.isAllowed(cidr.clientIp(req))) {
+    logger.warn(`Delete CIDR deny: ${cidr.clientIp(req)} not in allowlist`);
     return res.status(403).render("delete-result", {
       layout: false,
       error: "Forbidden",
