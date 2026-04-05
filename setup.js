@@ -7,6 +7,7 @@ const envContent = `# HTTP-305 Environment Configuration
 # Server
 PORT=8080
 LOG_LEVEL=debug
+TRUST_PROXY=1
 
 # Maximum download file size in bytes (default: 10MB)
 # MAX_DOWNLOAD_SIZE=10485760

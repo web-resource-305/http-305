@@ -136,6 +136,7 @@ Manual cache entry deletion via a browser form. Uses **strict CIDR gating** — 
 | `GITHUB_TOKEN` | (none) | GitHub PAT (no scopes needed) for curl-impersonate binary download — required on shared-IP hosts like Render where the unauthenticated GitHub API rate limit is quickly exhausted |
 | `SKIP_CURL_IMPERSONATE` | (none) | Set to `true` to skip curl-impersonate binary download entirely |
 | `CURL_IMPERSONATE_VERSION` | (none) | Pin curl-impersonate to a specific release tag (e.g. `v1.5.2`) instead of fetching latest |
+| `TRUST_PROXY` | `1` | Express `trust proxy` hop count. Set to `2` on Render (Cloudflare edge + internal hop before app). |
 
 ## Testing
 

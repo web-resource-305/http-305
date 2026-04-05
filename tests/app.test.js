@@ -68,14 +68,15 @@ describe("delete routes", () => {
 
 describe("trust proxy", () => {
   test("req.ip reflects X-Forwarded-For through multiple hops", async () => {
-    // Render routes through internal proxies, so X-Forwarded-For may have
-    // multiple entries: "client-ip, edge-ip". With trust proxy = true,
-    // Express should resolve req.ip to the leftmost (real client) IP.
+    // Render routes through Cloudflare + an internal hop before reaching the app,
+    // so X-Forwarded-For has 3 entries: "client-ip, cloudflare-ip, render-internal-ip".
+    // With trust proxy = 2, Express strips the 2 rightmost (trusted) hops and
+    // resolves req.ip to the leftmost (real client) IP.
     const res = await request(app)
       .get("/ping")
-      .set("X-Forwarded-For", "203.0.113.50, 10.22.128.15");
+      .set("X-Forwarded-For", "203.0.113.50, 172.70.247.88, 10.17.46.199");
     expect(res.status).toBe(200);
-    // /ping renders headers — the response should show the forwarded header
+    // /ping renders headers — the response should show the real client IP
     expect(res.text).toContain("203.0.113.50");
   });
 });
