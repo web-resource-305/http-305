@@ -10,7 +10,7 @@ const cidr = require("../lib/cidr");
 const fetchCurl = require("../lib/fetch-curl");
 
 const CACHE_DIR = path.join(__dirname, "..", ".cache");
-const MAX_DOWNLOAD_SIZE = Number(process.env.MAX_DOWNLOAD_SIZE) || 10 * 1024 * 1024;
+const MAX_DOWNLOAD_SIZE = Number(process.env.MAX_DOWNLOAD_SIZE) || 15 * 1024 * 1024;
 
 const ensureCacheDir = () => {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
@@ -618,7 +618,59 @@ const cacheHandler = async (req, res) => {
   }
 };
 
+const reportHandler = async (req, res) => {
+  if (!cidr.isAllowed(req.ip)) {
+    logger.warn(`CIDR deny (report): ${req.ip} not in allowlist`);
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  try {
+    // --- Local cache ---
+    const localStats = { fileCount: 0, totalSizeBytes: 0, byExtension: {} };
+    if (fs.existsSync(CACHE_DIR)) {
+      for (const name of fs.readdirSync(CACHE_DIR)) {
+        if (name.endsWith(".meta")) continue;
+        const ext = path.extname(name);
+        const size = fs.statSync(path.join(CACHE_DIR, name)).size;
+        localStats.fileCount++;
+        localStats.totalSizeBytes += size;
+        if (!localStats.byExtension[ext]) {
+          localStats.byExtension[ext] = { count: 0, sizeBytes: 0 };
+        }
+        localStats.byExtension[ext].count++;
+        localStats.byExtension[ext].sizeBytes += size;
+      }
+    }
+
+    // --- R2 cache ---
+    let r2Stats;
+    if (r2Cache.enabled) {
+      r2Stats = { enabled: true, fileCount: 0, totalSizeBytes: 0, byExtension: {} };
+      const items = await r2Cache.listAll();
+      for (const { key, size } of items) {
+        if (key.endsWith(".meta")) continue;
+        const ext = path.extname(key);
+        r2Stats.fileCount++;
+        r2Stats.totalSizeBytes += size;
+        if (!r2Stats.byExtension[ext]) {
+          r2Stats.byExtension[ext] = { count: 0, sizeBytes: 0 };
+        }
+        r2Stats.byExtension[ext].count++;
+        r2Stats.byExtension[ext].sizeBytes += size;
+      }
+    } else {
+      r2Stats = { enabled: false };
+    }
+
+    return res.json({ local: localStats, r2: r2Stats });
+  } catch (error) {
+    logger.error("Error in cache report:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = handler;
 module.exports.serveDownload = serveDownload;
 module.exports.hashHandler = hashHandler;
 module.exports.cacheHandler = cacheHandler;
+module.exports.reportHandler = reportHandler;

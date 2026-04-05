@@ -154,6 +154,7 @@ app.get("/pxy/*", async (req, res) => {
 });
 
 // Cache API — ensure a downloadable is cached and return JSON metadata (CIDR-protected)
+app.get("/api/cache/report", pxyDl.reportHandler);
 app.get("/api/cache", pxyDl.cacheHandler);
 
 // Upload — manual file upload to cache (strict CIDR: blocked when allowlist is unset)

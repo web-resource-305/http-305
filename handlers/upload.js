@@ -9,7 +9,7 @@ const r2Cache = require("../lib/r2-cache");
 const cidr = require("../lib/cidr");
 
 const CACHE_DIR = path.join(__dirname, "..", ".cache");
-const MAX_DOWNLOAD_SIZE = Number(process.env.MAX_DOWNLOAD_SIZE) || 10 * 1024 * 1024;
+const MAX_DOWNLOAD_SIZE = Number(process.env.MAX_DOWNLOAD_SIZE) || 15 * 1024 * 1024;
 
 // Build accept list from DOWNLOAD_TYPES for the form and for validation
 const ALLOWED_MIMES = new Set(Object.keys(DOWNLOAD_TYPES));
