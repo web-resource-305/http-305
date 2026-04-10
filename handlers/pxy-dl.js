@@ -275,26 +275,37 @@ const handler = async (req, res, urlToDownload) => {
     }
 
     // Tier 2: Check R2 before fetching upstream (avoids slow upstream fetch)
-    if (cachePath && r2Cache.enabled) {
-      try {
-        const r2Result = await r2Cache.get(getR2Key(cachePath));
-        if (r2Result) {
-          try {
-            const fileHash = crypto.createHash("sha256").update(r2Result.buffer).digest("hex");
-            writeToLocalCache(cachePath, r2Result.buffer);
-            writeMetadata(cachePath, { sourceUrl: urlToDownload, fileHash });
-            logger.info(`R2 early restore: ${cachePath}`);
-          } catch (restoreErr) {
-            logger.warn(`R2 early restore failed: ${restoreErr.message}`);
+    if (r2Cache.enabled) {
+      const r2KeysToTry = cachePath
+        ? [getR2Key(cachePath)]
+        : (() => {
+          const normalized = new URL(urlToDownload).href;
+          const hash = crypto.createHash("sha256").update(normalized).digest("hex");
+          return Object.values(DOWNLOAD_TYPES).map((ext) => `${hash}${ext}`);
+        })();
+      for (const r2Key of r2KeysToTry) {
+        try {
+          const r2Result = await r2Cache.get(r2Key);
+          if (r2Result) {
+            const restoredPath = path.join(CACHE_DIR, r2Key);
+            try {
+              const fileHash = crypto.createHash("sha256").update(r2Result.buffer).digest("hex");
+              writeToLocalCache(restoredPath, r2Result.buffer);
+              writeMetadata(restoredPath, { sourceUrl: urlToDownload, fileHash });
+              logger.info(`R2 early restore: ${restoredPath}`);
+            } catch (restoreErr) {
+              logger.warn(`R2 early restore failed: ${restoreErr.message}`);
+            }
+            const r2Mime = r2Result.metadata["x-mime"] || getMimeForExtension(path.extname(r2Key)) || hintMime;
+            res.setHeader("X-Cache", "r2");
+            if (r2Result.metadata["x-cached-at"]) {
+              res.setHeader("X-Cached-At", r2Result.metadata["x-cached-at"]);
+            }
+            return await serveDownload(res, urlToDownload, null, r2Mime);
           }
-          res.setHeader("X-Cache", "r2");
-          if (r2Result.metadata["x-cached-at"]) {
-            res.setHeader("X-Cached-At", r2Result.metadata["x-cached-at"]);
-          }
-          return await serveDownload(res, urlToDownload, null, hintMime);
+        } catch (r2Err) {
+          logger.warn(`R2 early check failed for ${r2Key}: ${r2Err.message}`);
         }
-      } catch (r2Err) {
-        logger.warn(`R2 early check failed: ${r2Err.message}`);
       }
     }
 
