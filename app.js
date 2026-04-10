@@ -13,7 +13,7 @@ logger.info(`Logging level: ${logger.level}`);
 const port = process.env.PORT || 8080;
 
 const app = express();
-app.set("trust proxy", Number(process.env.TRUST_PROXY || true));
+app.set("trust proxy", Number(process.env.TRUST_PROXY || true)); //hack
 app.use("/pxy/dl", rateLimit({
   windowMs: 60_000,
   max: 60,

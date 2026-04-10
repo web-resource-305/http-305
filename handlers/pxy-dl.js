@@ -25,6 +25,24 @@ const getCachePath = (url, ext) => {
 const getR2Key = (cachePath) => path.basename(cachePath);
 
 /**
+ * Scan the local cache directory for a file matching a URL hash (any extension).
+ * Useful when the URL has no file extension so we can't predict the cache key.
+ * @returns {{ cachePath: string, ext: string, mime: string } | null}
+ */
+const findCachedByHash = (url) => {
+  const normalized = new URL(url).href;
+  const hash = crypto.createHash("sha256").update(normalized).digest("hex");
+  ensureCacheDir();
+  const found = fs.readdirSync(CACHE_DIR).find(
+    (f) => f.startsWith(hash) && !f.endsWith(".meta") && !f.endsWith(".tmp")
+  );
+  if (!found) return null;
+  const ext = path.extname(found);
+  const mime = ext ? getMimeForExtension(ext) : "application/octet-stream";
+  return { cachePath: path.join(CACHE_DIR, found), ext, mime, hash };
+};
+
+/**
  * Atomically write a buffer to the local cache directory.
  */
 const writeToLocalCache = (cachePath, buffer) => {
@@ -241,11 +259,19 @@ const handler = async (req, res, urlToDownload) => {
     const urlExt = path.extname(parsedUrl.pathname).toLowerCase();
     const hintMime = getMimeForExtension(urlExt);
     const hintExt = getExtensionForMime(hintMime);
-    const cachePath = hintExt ? getCachePath(urlToDownload, hintExt) : null;
+    let cachePath = hintExt ? getCachePath(urlToDownload, hintExt) : null;
 
     if (cachePath && fs.existsSync(cachePath)) {
       // Tier 1: Serve from local cache without fetching
       return await serveDownload(res, urlToDownload, null, hintMime);
+    }
+
+    // Extensionless URL fallback: scan cache dir for matching hash
+    if (!cachePath) {
+      const found = findCachedByHash(urlToDownload);
+      if (found) {
+        return await serveDownload(res, urlToDownload, null, found.mime);
+      }
     }
 
     // Tier 2: Check R2 before fetching upstream (avoids slow upstream fetch)
@@ -474,39 +500,68 @@ const cacheHandler = async (req, res) => {
       ...(fetchMethod && { fetchMethod, curlProfile }),
     });
 
-    // Tier 1: Local cache
-    if (hintExt) {
-      const cachePath = getCachePath(url, hintExt);
-      if (fs.existsSync(cachePath)) {
-        const hash = path.basename(cachePath, hintExt);
-        const stat = fs.statSync(cachePath);
+    // Tier 1: Local cache — try extension-based lookup first, then hash scan
+    let cachePath = hintExt ? getCachePath(url, hintExt) : null;
+    let lookupExt = hintExt;
+    let lookupMime = hintMime;
+
+    if (cachePath && fs.existsSync(cachePath)) {
+      const hash = path.basename(cachePath, lookupExt);
+      const stat = fs.statSync(cachePath);
+      logger.info(`Cache API local hit: ${url}`);
+      return res.json(buildResponse(
+        hash, lookupExt, lookupMime, stat.size, stat.mtime.toISOString(), "local"
+      ));
+    }
+
+    // Extensionless URL fallback: scan cache dir for matching hash
+    if (!cachePath || !fs.existsSync(cachePath)) {
+      const found = findCachedByHash(url);
+      if (found) {
+        const stat = fs.statSync(found.cachePath);
+        logger.info(`Cache API local hit (hash scan): ${url}`);
         return res.json(buildResponse(
-          hash, hintExt, hintMime, stat.size, stat.mtime.toISOString(), "local"
+          found.hash, found.ext, found.mime, stat.size, stat.mtime.toISOString(), "local"
         ));
       }
+    }
 
-      // Tier 2: R2
-      if (r2Cache.enabled) {
-        const r2Key = getR2Key(cachePath);
+    // Tier 2: R2
+    if (r2Cache.enabled) {
+      // Try known key first, then scan all download extensions
+      const r2KeysToTry = cachePath
+        ? [getR2Key(cachePath)]
+        : [];
+      if (!hintExt) {
+        const normalized = new URL(url).href;
+        const hash = crypto.createHash("sha256").update(normalized).digest("hex");
+        for (const ext of Object.values(DOWNLOAD_TYPES)) {
+          r2KeysToTry.push(`${hash}${ext}`);
+        }
+      }
+      for (const r2Key of r2KeysToTry) {
         try {
           const r2Result = await r2Cache.get(r2Key);
           if (r2Result) {
-            const hash = path.basename(cachePath, hintExt);
+            const r2Ext = path.extname(r2Key);
+            const r2Hash = path.basename(r2Key, r2Ext);
+            const restoredPath = path.join(CACHE_DIR, r2Key);
             try {
               const fileHash = crypto.createHash("sha256").update(r2Result.buffer).digest("hex");
-              writeToLocalCache(cachePath, r2Result.buffer);
-              writeMetadata(cachePath, { sourceUrl: url, fileHash });
+              writeToLocalCache(restoredPath, r2Result.buffer);
+              writeMetadata(restoredPath, { sourceUrl: url, fileHash });
             } catch (restoreErr) {
               logger.warn(`R2 restore failed: ${restoreErr.message}`);
             }
-            const r2Mime = r2Result.metadata["x-mime"] || hintMime;
+            const r2Mime = r2Result.metadata["x-mime"] || (r2Ext ? getMimeForExtension(r2Ext) : lookupMime);
+            logger.info(`Cache API R2 hit: ${url}`);
             return res.json(buildResponse(
-              hash, hintExt, r2Mime, r2Result.buffer.length,
+              r2Hash, r2Ext, r2Mime, r2Result.buffer.length,
               r2Result.metadata["x-cached-at"] || new Date().toISOString(), "r2"
             ));
           }
         } catch (r2Err) {
-          logger.warn(`R2 check failed: ${r2Err.message}`);
+          logger.warn(`R2 check failed for ${r2Key}: ${r2Err.message}`);
         }
       }
     }
@@ -584,22 +639,22 @@ const cacheHandler = async (req, res) => {
     }
 
     const fileBuffer = Buffer.from(await response.arrayBuffer());
-    const cachePath = getCachePath(url, resolved.ext);
-    const hash = path.basename(cachePath, resolved.ext);
+    const savePath = getCachePath(url, resolved.ext);
+    const hash = path.basename(savePath, resolved.ext);
     const fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
     const cachedAt = new Date().toISOString();
 
     try {
-      writeToLocalCache(cachePath, fileBuffer);
-      writeMetadata(cachePath, { sourceUrl: url, fileHash });
-      logger.info(`Cached file: ${cachePath}`);
+      writeToLocalCache(savePath, fileBuffer);
+      writeMetadata(savePath, { sourceUrl: url, fileHash });
+      logger.info(`Cached file: ${savePath}`);
     } catch (cacheErr) {
       logger.warn(`Failed to cache file: ${cacheErr.message}`);
     }
 
     if (r2Cache.enabled) {
       r2Cache
-        .put(getR2Key(cachePath), fileBuffer, {
+        .put(getR2Key(savePath), fileBuffer, {
           "x-source-url": url,
           "x-cached-at": cachedAt,
           "x-mime": resolved.mime,
