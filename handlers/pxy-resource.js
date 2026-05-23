@@ -6,10 +6,20 @@
 const { Readable } = require("stream");
 const logger = require("../lib/logger");
 const fetchUrl = require("../lib/fetch-url");
+const { enabled: curlEnabled, fetchWithCurl, LATEST_CHROME_VERSION } = require("../lib/fetch-curl");
 const isValidUrl = require("../lib/validate-url");
 const path = require("path");
 const { getMimeForExtension } = require("../lib/content-types");
 const { rewriteCSSUrls } = require("../lib/html-rewriter");
+
+const MOBILE_UA_RE = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+
+const buildGooglebotUA = (isMobile) => {
+  const v = `${LATEST_CHROME_VERSION}.0.0.0`;
+  return isMobile
+    ? `Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${v} Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)`
+    : `Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/${v} Safari/537.36`;
+};
 
 /**
  * @param {import('express').Request} req
@@ -34,8 +44,13 @@ module.exports = async (req, res, resourceToProxy) => {
     const urlToProxy = new URL(resourceToProxy);
     logger.debug(`Fetching resource: ${urlToProxy.href}`);
 
+    const isMobile = MOBILE_UA_RE.test(req.headers["user-agent"] || "");
+    const googlebotUA = buildGooglebotUA(isMobile);
+
     try {
-      const response = await fetchUrl(urlToProxy.href);
+      const response = curlEnabled
+        ? await fetchWithCurl(urlToProxy.href, googlebotUA)
+        : await fetchUrl(urlToProxy.href, googlebotUA);
 
       // Handle non-OK responses
       if (!response.ok) {
