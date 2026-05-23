@@ -7,9 +7,19 @@
 const { Readable } = require("stream");
 const logger = require("../lib/logger");
 const fetchUrl = require("../lib/fetch-url");
+const { enabled: curlEnabled, fetchWithCurl, LATEST_CHROME_VERSION } = require("../lib/fetch-curl");
 const isValidUrl = require("../lib/validate-url");
 const { parseMime, isDownloadable, isHTML } = require("../lib/content-types");
 const { rewriteHTML } = require("../lib/html-rewriter");
+
+const MOBILE_UA_RE = /Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+
+const buildGooglebotUA = (isMobile) => {
+  const v = `${LATEST_CHROME_VERSION}.0.0.0`;
+  return isMobile
+    ? `Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${v} Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)`
+    : `Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/${v} Safari/537.36`;
+};
 
 /**
  * @param {import('express').Request} req
@@ -37,8 +47,14 @@ module.exports = async (req, res, urlToProxy) => {
   const parsedUrl = new URL(urlToProxy);
   logger.info(`Auto-detecting content type for: ${parsedUrl.href}`);
 
+  const isMobile = MOBILE_UA_RE.test(req.headers["user-agent"] || "");
+  const googlebotUA = buildGooglebotUA(isMobile);
+  logger.debug(`Using ${isMobile ? "mobile" : "desktop"} Googlebot UA, curl-impersonate: ${curlEnabled}`);
+
   try {
-    const response = await fetchUrl(parsedUrl.href);
+    const response = curlEnabled
+      ? await fetchWithCurl(parsedUrl.href, googlebotUA)
+      : await fetchUrl(parsedUrl.href, googlebotUA);
 
     if (!response.ok) {
       logger.error(`Failed to fetch URL: ${parsedUrl.href}, Status: ${response.status}`);
